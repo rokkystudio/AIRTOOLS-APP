@@ -8,12 +8,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * Runs the Hashcat executable packaged with the application and forwards its
- * combined stdout and stderr stream to the caller line by line.
+ * Launches a native Hashcat executable stored in the APK as a native shared
+ * object. Android extracts jniLibs into applicationInfo.nativeLibraryDir during
+ * installation when jniLibs.useLegacyPackaging is enabled in Gradle.
  *
- * The packaged executable is expected at nativeLibraryDir/libhashcat_exec.so.
- * Input files must be regular filesystem files because native Hashcat cannot
- * consume Android content:// URIs directly.
+ * Put the executable for every supported ABI here:
+ * app/src/main/jniLibs/arm64-v8a/libhashcat_exec.so
+ * app/src/main/jniLibs/armeabi-v7a/libhashcat_exec.so
+ * app/src/main/jniLibs/x86_64/libhashcat_exec.so
  */
 class HashcatRunner(
     private val context: Context
@@ -54,30 +56,41 @@ class HashcatRunner(
     }
 
     /**
-     * Describes whether the APK contains the native Hashcat executable expected
-     * by this runner and includes the current device ABI in the message.
+     * Shows the active ABI, native extraction directory and whether the bundled
+     * executable is already present and runnable.
      */
     fun backendStatus(): String
     {
         val executable = resolveExecutable()
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+        val nativeDirectory = resolveNativeLibraryDirectory()
 
-        return if (executable.isFile)
+        val status = when
         {
-            "Hashcat backend: ${executable.absolutePath}\nABI: $abi"
+            executable.isFile && executable.canExecute() -> "ready"
+            executable.isFile -> "found, not executable"
+            else -> "missing"
         }
-        else
-        {
-            "Hashcat backend не найден: ${executable.absolutePath}\nABI: $abi"
+
+        return buildString {
+            append("Hashcat native backend: ")
+            append(status)
+            append('\n')
+            append("ABI: ")
+            append(abi)
+            append('\n')
+            append("Native dir: ")
+            append(nativeDirectory.absolutePath)
+            append('\n')
+            append("Expected: ")
+            append(executable.absolutePath)
         }
     }
 
     /**
-     * Starts a straight dictionary attack for the supplied hash mode and forwards
-     * live process output to the listener.
-     *
-     * @throws IOException when the packaged native executable is unavailable.
-     * @throws IllegalStateException when another Hashcat process is already alive.
+     * Starts the native .so executable and forwards live stdout/stderr output to
+     * the listener. Inputs are regular private files because native code cannot
+     * read Android content:// URIs directly.
      */
     @Synchronized
     fun start(
@@ -92,14 +105,8 @@ class HashcatRunner(
             throw IllegalStateException("Hashcat уже запущен.")
         }
 
-        val executable = resolveExecutable()
-
-        if (!executable.isFile)
-        {
-            throw IOException(
-                "Native Hashcat backend отсутствует. Ожидается ${executable.absolutePath}."
-            )
-        }
+        val executable = prepareExecutable()
+        val nativeDirectory = resolveNativeLibraryDirectory()
 
         val workDirectory = File(context.filesDir, "hashcat").apply {
             mkdirs()
@@ -137,8 +144,10 @@ class HashcatRunner(
 
         processBuilder.environment().apply {
             put("HOME", workDirectory.absolutePath)
+            put("TMPDIR", cacheDirectory.absolutePath)
             put("XDG_DATA_HOME", dataDirectory.absolutePath)
             put("XDG_CACHE_HOME", cacheDirectory.absolutePath)
+            putNativeLibraryPath(nativeDirectory)
         }
 
         val startedProcess = processBuilder.start()
@@ -175,8 +184,8 @@ class HashcatRunner(
     }
 
     /**
-     * Requests termination of the current Hashcat process and forcibly terminates
-     * it when it remains alive after the graceful process destroy interval.
+     * Requests termination of the current native process and kills it if it does
+     * not exit quickly after the graceful signal.
      */
     fun stop()
     {
@@ -193,15 +202,70 @@ class HashcatRunner(
     }
 
     /**
-     * Returns the APK native-library path reserved for the packaged Hashcat
-     * executable.
+     * Validates that the extracted native .so exists and is executable.
+     */
+    private fun prepareExecutable(): File
+    {
+        val executable = resolveExecutable()
+
+        if (!executable.isFile)
+        {
+            throw IOException(
+                "Native Hashcat backend отсутствует. Положи бинарник в " +
+                    "app/src/main/jniLibs/<abi>/$HASHCAT_EXECUTABLE_NAME"
+            )
+        }
+
+        if (!executable.canExecute())
+        {
+            executable.setExecutable(true, false)
+        }
+
+        if (!executable.canExecute())
+        {
+            throw IOException(
+                "Native Hashcat backend найден, но не исполняется: " +
+                    executable.absolutePath
+            )
+        }
+
+        return executable
+    }
+
+    /**
+     * Resolves the already-extracted native executable path.
      */
     private fun resolveExecutable(): File
     {
         return File(
-            context.applicationInfo.nativeLibraryDir,
+            resolveNativeLibraryDirectory(),
             HASHCAT_EXECUTABLE_NAME
         )
+    }
+
+    /**
+     * Resolves Android's install-time native-library extraction directory.
+     */
+    private fun resolveNativeLibraryDirectory(): File
+    {
+        return File(context.applicationInfo.nativeLibraryDir)
+    }
+
+    /**
+     * Prepends APK-extracted native libraries to LD_LIBRARY_PATH so companion
+     * native dependencies can be placed in the same jniLibs/<abi>/ directory.
+     */
+    private fun MutableMap<String, String>.putNativeLibraryPath(nativeDirectory: File)
+    {
+        val current = this["LD_LIBRARY_PATH"].orEmpty()
+        this["LD_LIBRARY_PATH"] = if (current.isBlank())
+        {
+            nativeDirectory.absolutePath
+        }
+        else
+        {
+            nativeDirectory.absolutePath + ":" + current
+        }
     }
 
     private companion object
