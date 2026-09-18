@@ -15,8 +15,10 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        // Must stay in sync with the :hashcat module: the native payload is
+        // only produced for arm64-v8a.
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
@@ -31,6 +33,7 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            keepDebugSymbols += "**/libhashcat_exec.so"
         }
     }
 
@@ -47,4 +50,5 @@ android {
 dependencies {
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.core.ktx)
+    implementation(project(":hashcat"))
 }

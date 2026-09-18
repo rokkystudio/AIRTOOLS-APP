@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "AIRTOOLS"
 include(":app")
- 
+include(":hashcat")

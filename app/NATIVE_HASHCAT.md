@@ -2,28 +2,30 @@
 
 AIRTOOLS launches Hashcat as a native executable stored in the APK.
 
-Expected payload layout:
+The Hashcat runtime is not stored directly under `src/main`. It is built in the
+separate `HASHCAT` project and imported into AIRTOOLS by:
 
-```text
-app/src/main/jniLibs/arm64-v8a/libhashcat_exec.so
-app/src/main/jniLibs/armeabi-v7a/libhashcat_exec.so
-app/src/main/jniLibs/x86_64/libhashcat_exec.so
+```powershell
+.\tools\import-hashcat-android.ps1
 ```
 
-The executable is intentionally named `libhashcat_exec.so` so Android treats it
-as a native library, extracts it at install time, and exposes it through:
+The import script writes generated files into:
+
+```text
+hashcat/build/generated/hashcatRuntime/jniLibs/arm64-v8a/libhashcat_exec.so
+hashcat/build/generated/hashcatRuntime/assets/hashcat/
+```
+
+The `:hashcat` Android library module exposes that generated directory through
+its Gradle `sourceSets`, and the app depends on the module with:
 
 ```kotlin
-context.applicationInfo.nativeLibraryDir
+implementation(project(":hashcat"))
 ```
 
-`app/build.gradle.kts` enables `jniLibs.useLegacyPackaging = true`, which keeps
-this backend available as an extracted file. `HashcatRunner` executes:
+At runtime `HashcatRunner` copies the generated APK assets into app-private
+storage and executes the extracted `libhashcat_exec.so` as a native process.
 
-```text
-<applicationInfo.nativeLibraryDir>/libhashcat_exec.so
-```
-
-Companion native dependencies for the same ABI can be placed in the same ABI
-folder. Runtime data that is not a native `.so` cannot be automatically extracted
-by Android from `jniLibs`; keep only real native `.so` files in ABI folders.
+The executable is intentionally named `libhashcat_exec.so` so Android packages it
+as a native library. `jniLibs.useLegacyPackaging = true` keeps it available as an
+extracted file.
