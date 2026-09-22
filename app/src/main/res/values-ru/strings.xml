@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">AIRTOOLS</string>
+    <string name="app_icon">Иконка AIRTOOLS</string>
+    <string name="change_theme">Сменить тему</string>
+    <string name="change_language">Сменить язык</string>
+    <string name="status_connected">Устройство подключено</string>
+    <string name="status_connecting">Подключение к устройству</string>
+    <string name="status_connection_error">Ошибка подключения</string>
+    <string name="status_server_unavailable">Сервер недоступен</string>
+    <string name="no_network_selected">Wi-Fi сеть не выбрана</string>
+    <string name="network_details">%1$s\n%2$s • канал %3$d</string>
+    <string name="scan">Сканировать</string>
+    <string name="start">Старт</string>
+    <string name="stop">Стоп</string>
+    <string name="handshakes">Handshake</string>
+    <string name="aireplay_test">Тест aireplay</string>
+    <string name="select_wifi_network">Выбор Wi-Fi сети</string>
+    <string name="scanning_networks">Сканирование каналов 1–13…</string>
+    <string name="no_networks_yet">Сети пока не найдены. Сканирование…</string>
+    <string name="networks_found">Найдено сетей: %1$d • нажмите для выбора</string>
+    <string name="network_row">%1$s\n%2$s • канал %3$d</string>
+    <string name="hidden_network">&lt;скрытая&gt;</string>
+    <string name="selecting_network">Выбор %1$s…</string>
+    <string name="select_network_first">Сначала выберите Wi-Fi сеть.</string>
+    <string name="stopping">Остановка</string>
+    <string name="starting">Запуск</string>
+    <string name="no_handshakes">Handshake не найдены.</string>
+    <string name="handshake_row">%1$s  %2$s\nкадров=%3$d  %4$s</string>
+    <string name="action_progress">%1$s…</string>
+    <string name="operation_failed">Ошибка операции</string>
+    <string name="scan_failed">Ошибка сканирования</string>
+    <string name="ok">OK</string>
+</resources>
