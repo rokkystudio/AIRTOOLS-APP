@@ -1,19 +1,28 @@
 package fuck.system.airtools.device
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.net.InetSocketAddress
-import java.net.Socket
 
 /** Blocking TCP request/response client for the embedded /bin/airtools service. */
 class AirtoolsTcpClient(
+    context: Context,
     private val host: String = AirtoolsDevice.DEFAULT_HOST,
     private val port: Int = AirtoolsDevice.DEFAULT_PORT,
     private val timeoutMillis: Int = AirtoolsDevice.DEFAULT_TIMEOUT_MILLIS
 )
 {
+    private val connectivityManager =
+        context.applicationContext.getSystemService(ConnectivityManager::class.java)
+
     fun request(command: String): AirtoolsResponse
     {
-        Socket().use { socket ->
+        val network = wifiNetwork()
+        network.socketFactory.createSocket().use { socket ->
             socket.connect(InetSocketAddress(host, port), timeoutMillis)
             socket.soTimeout = timeoutMillis
             socket.getOutputStream().apply {
@@ -34,6 +43,16 @@ class AirtoolsTcpClient(
             require(text.isNotEmpty()) { "Empty server response" }
             return AirtoolsResponse(command, text)
         }
+    }
+
+    private fun wifiNetwork(): Network
+    {
+        return connectivityManager.allNetworks.firstOrNull { network ->
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true &&
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN).not() &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+        } ?: throw IOException("Wi-Fi network unavailable")
     }
 
     companion object

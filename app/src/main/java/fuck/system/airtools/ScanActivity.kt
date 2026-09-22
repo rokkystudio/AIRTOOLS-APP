@@ -2,6 +2,7 @@ package fuck.system.airtools
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.ArrayAdapter
 import fuck.system.airtools.databinding.ActivityScanBinding
 import fuck.system.airtools.device.AirtoolsRepository
@@ -12,7 +13,7 @@ import kotlin.concurrent.thread
 class ScanActivity : ThemedActivity()
 {
     private lateinit var binding: ActivityScanBinding
-    private val repository = AirtoolsRepository()
+    private lateinit var repository: AirtoolsRepository
     @Volatile private var active = false
     @Volatile private var scanStarted = false
     private var networks: List<WifiNetwork> = emptyList()
@@ -20,6 +21,7 @@ class ScanActivity : ThemedActivity()
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
+        repository = AirtoolsRepository(applicationContext)
         binding = ActivityScanBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setupTopBar(binding.topBar, getString(R.string.select_wifi_network))
@@ -32,6 +34,7 @@ class ScanActivity : ThemedActivity()
     {
         super.onResume()
         active = true
+        binding.scanProgressBar.visibility = View.VISIBLE
         thread(name = "airtools-network-scan") { scanLoop() }
     }
 
@@ -74,13 +77,19 @@ class ScanActivity : ThemedActivity()
             catch (_: IOException)
             {
                 runOnUiThread {
-                    if (active) binding.scanStatusTextView.text = getString(R.string.status_server_unavailable)
+                    if (active) {
+                        binding.scanProgressBar.visibility = View.GONE
+                        binding.scanStatusTextView.text = getString(R.string.status_server_unavailable)
+                    }
                 }
             }
             catch (_: Throwable)
             {
                 runOnUiThread {
-                    if (active) binding.scanStatusTextView.text = getString(R.string.scan_failed)
+                    if (active) {
+                        binding.scanProgressBar.visibility = View.GONE
+                        binding.scanStatusTextView.text = getString(R.string.scan_failed)
+                    }
                 }
             }
             try
@@ -97,6 +106,7 @@ class ScanActivity : ThemedActivity()
     private fun renderNetworks(current: List<WifiNetwork>)
     {
         networks = current
+        binding.scanProgressBar.visibility = View.GONE
         binding.scanStatusTextView.text = if (current.isEmpty()) {
             getString(R.string.no_networks_yet)
         } else {

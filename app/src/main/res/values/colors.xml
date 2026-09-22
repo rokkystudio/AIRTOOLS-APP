@@ -10,9 +10,8 @@
     <color name="text_secondary">#FF515255</color>
     <color name="accent">#FF69AFED</color>
     <color name="status_connected">#FF45C97A</color>
-    <color name="status_connecting">#FFE3A12F</color>
+    <color name="status_connecting">#FF777B80</color>
     <color name="status_disconnected">#FF777B80</color>
-    <color name="status_error">#FFC74A4A</color>
     <color name="title_bar_button_pressed">#FFD8DEE6</color>
     <color name="button_pressed">#FFEFF2F5</color>
 </resources>

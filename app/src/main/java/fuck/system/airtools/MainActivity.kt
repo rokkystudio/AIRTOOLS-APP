@@ -14,7 +14,7 @@ import kotlin.concurrent.thread
 class MainActivity : ThemedActivity()
 {
     private lateinit var binding: ActivityMainBinding
-    private val repository = AirtoolsRepository()
+    private lateinit var repository: AirtoolsRepository
     @Volatile private var busy = false
     @Volatile private var monitorGeneration = 0
     private var connected = false
@@ -24,6 +24,7 @@ class MainActivity : ThemedActivity()
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
+        repository = AirtoolsRepository(applicationContext)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setupTopBar(binding.topBar, getString(R.string.app_name))
@@ -102,7 +103,7 @@ class MainActivity : ThemedActivity()
                         if (generation != monitorGeneration) return@runOnUiThread
                         connected = false
                         status = null
-                        renderConnectionState(ConnectionState.ERROR)
+                        renderConnectionState(ConnectionState.UNAVAILABLE)
                         renderControls()
                     }
                 }
@@ -233,7 +234,6 @@ class MainActivity : ThemedActivity()
         {
             ConnectionState.CONNECTED -> R.string.status_connected to R.color.status_connected
             ConnectionState.CONNECTING -> R.string.status_connecting to R.color.status_connecting
-            ConnectionState.ERROR -> R.string.status_connection_error to R.color.status_error
             ConnectionState.UNAVAILABLE -> R.string.status_server_unavailable to R.color.status_disconnected
         }
         binding.connectionStatusTextView.setText(textRes)
@@ -299,7 +299,6 @@ class MainActivity : ThemedActivity()
     {
         CONNECTED,
         CONNECTING,
-        ERROR,
         UNAVAILABLE
     }
 

@@ -1,9 +1,12 @@
 package fuck.system.airtools.device
 
+import android.content.Context
+
 import java.net.URLEncoder
 
-class AirtoolsRepository(private val client: AirtoolsTcpClient = AirtoolsTcpClient())
+class AirtoolsRepository(context: Context)
 {
+    private val client = AirtoolsTcpClient(context.applicationContext)
     fun status(): AirtoolsStatus
     {
         val response = client.request("/status")

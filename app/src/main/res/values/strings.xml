@@ -5,7 +5,6 @@
     <string name="change_language">Change language</string>
     <string name="status_connected">Device connected</string>
     <string name="status_connecting">Connecting to device</string>
-    <string name="status_connection_error">Connection error</string>
     <string name="status_server_unavailable">Server unavailable</string>
     <string name="no_network_selected">No Wi-Fi network selected</string>
     <string name="network_details">%1$s\n%2$s • channel %3$d</string>
@@ -16,7 +15,7 @@
     <string name="aireplay_test">Aireplay test</string>
     <string name="select_wifi_network">Select Wi-Fi network</string>
     <string name="scanning_networks">Scanning channels 1–13…</string>
-    <string name="no_networks_yet">No networks yet. Scanning…</string>
+    <string name="no_networks_yet">Scanning active • no networks yet</string>
     <string name="networks_found">%1$d networks found • tap to select</string>
     <string name="network_row">%1$s\n%2$s • channel %3$d</string>
     <string name="hidden_network">&lt;hidden&gt;</string>
