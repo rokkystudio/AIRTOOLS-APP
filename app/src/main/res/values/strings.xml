@@ -10,25 +10,20 @@
     <string name="waiting_for_device">Waiting for device…</string>
     <string name="device_unavailable_hint">Waiting for the AIRTOOLS device. The app will reconnect automatically.</string>
     <string name="wifi_networks">Wi-Fi networks</string>
-    <string name="scanning_channels">Scanning channels 1–13 continuously</string>
+    <string name="scanning_channels">Scanning Wi-Fi networks</string>
     <plurals name="networks_found">
         <item quantity="one">%d network found</item>
         <item quantity="other">%d networks found</item>
     </plurals>
     <string name="hidden_network">&lt;hidden&gt;</string>
-    <string name="network_meta">Channel %1$d • Beacons %2$d • Data %3$d</string>
-    <string name="signal_dbm">%1$s  %2$d dBm</string>
+    <string name="network_meta">Channel %1$d</string>
+    <string name="signal_dbm">%1$d dBm · %2$d%%</string>
     <string name="signal_unknown">— dBm</string>
     <string name="channel_value">Channel %1$d</string>
-    <string name="signal_value">Signal %1$d dBm</string>
+    <string name="signal_value">Signal %1$d dBm · %2$d%%</string>
     <string name="signal_value_unknown">Signal —</string>
     <string name="capture_active">Capture active</string>
     <string name="capture_counters">Beacons: %1$d\nProbe responses: %2$d\nData frames: %3$d</string>
     <string name="handshake_title">WPA handshake</string>
     <string name="handshake_waiting">Waiting for a handshake…</string>
-    <string name="handshake_captured">Captured • %1$d frames\n%2$s</string>
-    <string name="aireplay_test">Aireplay test</string>
-    <string name="aireplay_running">Running aireplay test…</string>
-    <string name="aireplay_ok">Aireplay test completed</string>
-    <string name="operation_failed">Operation failed</string>
-</resources>
+    <string name="handshake_captured">Captured • %1$d frames\n%2$s</string></resources>

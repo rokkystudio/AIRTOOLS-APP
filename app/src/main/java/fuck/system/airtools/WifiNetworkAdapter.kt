@@ -39,21 +39,22 @@ class WifiNetworkAdapter(private val context: Context) : BaseAdapter()
         binding.networkBssidTextView.text = network.bssid
         binding.networkMetaTextView.text = context.getString(
             R.string.network_meta,
-            network.channel,
-            network.beacons,
-            network.dataFrames
+            network.channel
         )
-        binding.networkSignalTextView.text = network.signalDbm?.let {
-            context.getString(R.string.signal_dbm, signalBars(it), it)
-        } ?: context.getString(R.string.signal_unknown)
+        val signal = network.signalDbm
+        if (signal != null) {
+            val percent = signalPercent(signal)
+            binding.networkSignalTextView.text = context.getString(R.string.signal_dbm, signal, percent)
+            binding.networkSignalProgressBar.progress = percent
+            binding.networkSignalProgressBar.visibility = View.VISIBLE
+        } else {
+            binding.networkSignalTextView.text = context.getString(R.string.signal_unknown)
+            binding.networkSignalProgressBar.progress = 0
+            binding.networkSignalProgressBar.visibility = View.INVISIBLE
+        }
         return binding.root
     }
 
-    private fun signalBars(dbm: Int): String = when
-    {
-        dbm >= -50 -> "▂▄▆█"
-        dbm >= -60 -> "▂▄▆"
-        dbm >= -70 -> "▂▄"
-        else -> "▂"
-    }
+    private fun signalPercent(dbm: Int): Int = ((dbm + 100).coerceIn(0, 70) * 100 / 70)
+
 }

@@ -10,7 +10,7 @@
     <string name="waiting_for_device">Ожидание устройства…</string>
     <string name="device_unavailable_hint">Ожидание устройства AIRTOOLS. Приложение подключится автоматически.</string>
     <string name="wifi_networks">Wi-Fi сети</string>
-    <string name="scanning_channels">Непрерывное сканирование каналов 1–13</string>
+    <string name="scanning_channels">Сканирование Wi-Fi сетей</string>
     <plurals name="networks_found">
         <item quantity="one">Найдена %d сеть</item>
         <item quantity="few">Найдено %d сети</item>
@@ -18,19 +18,14 @@
         <item quantity="other">Найдено %d сети</item>
     </plurals>
     <string name="hidden_network">&lt;скрытая&gt;</string>
-    <string name="network_meta">Канал %1$d • Beacon %2$d • Data %3$d</string>
-    <string name="signal_dbm">%1$s  %2$d dBm</string>
+    <string name="network_meta">Канал %1$d</string>
+    <string name="signal_dbm">%1$d dBm · %2$d%%</string>
     <string name="signal_unknown">— dBm</string>
     <string name="channel_value">Канал %1$d</string>
-    <string name="signal_value">Сигнал %1$d dBm</string>
+    <string name="signal_value">Сигнал %1$d dBm · %2$d%%</string>
     <string name="signal_value_unknown">Сигнал —</string>
     <string name="capture_active">Захват активен</string>
     <string name="capture_counters">Beacon: %1$d\nProbe response: %2$d\nData-кадры: %3$d</string>
     <string name="handshake_title">WPA handshake</string>
     <string name="handshake_waiting">Ожидание handshake…</string>
-    <string name="handshake_captured">Получен • кадров: %1$d\n%2$s</string>
-    <string name="aireplay_test">Тест aireplay</string>
-    <string name="aireplay_running">Выполняется тест aireplay…</string>
-    <string name="aireplay_ok">Тест aireplay завершён</string>
-    <string name="operation_failed">Операция не выполнена</string>
-</resources>
+    <string name="handshake_captured">Получен • кадров: %1$d\n%2$s</string></resources>

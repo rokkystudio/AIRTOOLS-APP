@@ -8,6 +8,7 @@ import fuck.system.airtools.device.AirodumpTarget
 import fuck.system.airtools.device.AirtoolsRepository
 import fuck.system.airtools.device.AirtoolsStatus
 import fuck.system.airtools.device.HandshakeIndexEntry
+import fuck.system.airtools.device.DeviceMode
 import fuck.system.airtools.device.WifiNetwork
 import kotlin.concurrent.thread
 
@@ -38,7 +39,6 @@ class MainActivity : ThemedActivity()
             selectNetwork(networkAdapter.getItem(position))
         }
         binding.topBar.backButton.setOnClickListener { returnToNetworkSelection() }
-        binding.aireplayTestButton.setOnClickListener { runAireplayTest() }
 
         selectedNetwork = loadSelectedNetwork()
         renderConnection(ConnectionState.CONNECTING)
@@ -69,16 +69,25 @@ class MainActivity : ThemedActivity()
                     val status = repository.status()
                     consecutiveFailures = 0
                     connectedOnce = true
-                    when
-                    {
-                        status.scanningNetworks -> updateScanning(generation, repository.networks())
-                        status.running && status.target is AirodumpTarget.Bssid -> updateCapture(generation, status)
-                        status.target is AirodumpTarget.Bssid && status.channel != null -> {
-                            repository.start()
+                    runOnUiThread {
+                        if (generation == monitorGeneration) {
+                            renderConnection(ConnectionState.CONNECTED)
+                            when (status.mode) {
+                                DeviceMode.SCAN -> renderScreen(Screen.SCAN)
+                                DeviceMode.CAPTURE -> renderScreen(Screen.CAPTURE)
+                                DeviceMode.IDLE -> renderScreen(Screen.CONNECTING)
+                            }
                         }
-                        else -> {
-                            repository.startNetworkScan()
+                    }
+                    try {
+                        when (status.mode)
+                        {
+                            DeviceMode.SCAN -> repository.networks().let { updateScanning(generation, it) }
+                            DeviceMode.CAPTURE -> updateCapture(generation, status)
+                            DeviceMode.IDLE -> repository.startNetworkScan()
                         }
+                    } catch (_: Throwable) {
+                        // /status succeeded: keep the device connected and retry mode data next poll.
                     }
                 }
                 catch (_: Throwable)
@@ -124,12 +133,13 @@ class MainActivity : ThemedActivity()
     private fun updateCapture(generation: Int, status: AirtoolsStatus)
     {
         val target = status.target as AirodumpTarget.Bssid
-        val networks = repository.networks()
+        val networks = runCatching { repository.networks() }.getOrDefault(emptyList())
         val live = networks.firstOrNull { it.bssid.equals(target.value, ignoreCase = true) }
         val cached = selectedNetwork?.takeIf { it.bssid.equals(target.value, ignoreCase = true) }
             ?: loadSelectedNetwork()?.takeIf { it.bssid.equals(target.value, ignoreCase = true) }
         val network = mergeNetwork(live, cached, target.value, status.channel ?: cached?.channel ?: 0)
-        val handshakes = repository.handshakes().second.filter { it.bssid.equals(target.value, ignoreCase = true) }
+        val handshakes = runCatching { repository.handshakes().second }.getOrDefault(emptyList())
+            .filter { it.bssid.equals(target.value, ignoreCase = true) }
         runOnUiThread {
             if (generation != monitorGeneration) return@runOnUiThread
             selectedNetwork = network
@@ -173,7 +183,7 @@ class MainActivity : ThemedActivity()
                     renderScreen(Screen.CAPTURE)
                     renderCapture(network, null)
                 }
-                if (status.running && status.target is AirodumpTarget.Bssid) {
+                if (status.mode == DeviceMode.CAPTURE && status.target is AirodumpTarget.Bssid) {
                     consecutiveFailures = 0
                 }
             }
@@ -200,7 +210,7 @@ class MainActivity : ThemedActivity()
             try
             {
                 repository.startNetworkScan()
-                val networks = repository.networks()
+                val networks = runCatching { repository.networks() }.getOrDefault(emptyList())
                 runOnUiThread {
                     renderConnection(ConnectionState.CONNECTED)
                     renderScreen(Screen.SCAN)
@@ -223,30 +233,6 @@ class MainActivity : ThemedActivity()
             {
                 commandInProgress = false
                 runOnUiThread { binding.topBar.backButton.isEnabled = true }
-            }
-        }
-    }
-
-    private fun runAireplayTest()
-    {
-        if (commandInProgress || currentScreen != Screen.CAPTURE) return
-        commandInProgress = true
-        binding.aireplayTestButton.isEnabled = false
-        binding.aireplayResultTextView.text = getString(R.string.aireplay_running)
-        thread(name = "airtools-aireplay-test") {
-            try
-            {
-                repository.aireplayTest()
-                runOnUiThread { binding.aireplayResultTextView.text = getString(R.string.aireplay_ok) }
-            }
-            catch (_: Throwable)
-            {
-                runOnUiThread { binding.aireplayResultTextView.text = getString(R.string.operation_failed) }
-            }
-            finally
-            {
-                commandInProgress = false
-                runOnUiThread { binding.aireplayTestButton.isEnabled = true }
             }
         }
     }
@@ -282,8 +268,10 @@ class MainActivity : ThemedActivity()
         binding.captureNetworkNameTextView.text = displayEssid(network)
         binding.captureBssidTextView.text = network.bssid
         binding.captureChannelTextView.text = getString(R.string.channel_value, network.channel)
-        binding.captureSignalTextView.text = network.signalDbm?.let { getString(R.string.signal_value, it) }
+        binding.captureSignalTextView.text = network.signalDbm?.let { getString(R.string.signal_value, it, signalPercent(it)) }
             ?: getString(R.string.signal_value_unknown)
+        binding.captureSignalProgressBar.progress = network.signalDbm?.let(::signalPercent) ?: 0
+        binding.captureSignalProgressBar.visibility = if (network.signalDbm == null) View.INVISIBLE else View.VISIBLE
         binding.captureCountersTextView.text = getString(
             R.string.capture_counters,
             network.beacons,
@@ -302,6 +290,8 @@ class MainActivity : ThemedActivity()
             )
         }
     }
+
+    private fun signalPercent(dbm: Int): Int = ((dbm + 100).coerceIn(0, 70) * 100 / 70)
 
     private fun displayEssid(network: WifiNetwork): String =
         if (network.essid == "<hidden/unknown>") getString(R.string.hidden_network) else network.essid

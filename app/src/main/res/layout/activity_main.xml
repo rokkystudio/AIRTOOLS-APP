@@ -182,6 +182,17 @@
                             android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
+
+                    <ProgressBar
+                        android:id="@+id/captureSignalProgressBar"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="5dp"
+                        android:layout_marginTop="12dp"
+                        android:max="100"
+                        android:progress="0"
+                        android:progressBackgroundTint="@color/border_strong"
+                        android:progressTint="@color/accent" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -239,28 +250,6 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <Button
-                    android:id="@+id/aireplayTestButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_button"
-                    android:stateListAnimator="@null"
-                    android:text="@string/aireplay_test"
-                    android:textAllCaps="false"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/aireplayResultTextView"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
             </LinearLayout>
         </ScrollView>
 

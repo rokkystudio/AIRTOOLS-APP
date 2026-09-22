@@ -8,13 +8,12 @@ sealed class AirodumpTarget
 
 data class AirodumpConfig(val target: AirodumpTarget, val channel: Int)
 
+enum class DeviceMode { IDLE, SCAN, CAPTURE }
+
 data class AirtoolsStatus(
-    val running: Boolean,
-    val scanningNetworks: Boolean,
-    val pid: Int,
+    val mode: DeviceMode,
     val target: AirodumpTarget,
-    val channel: Int?,
-    val statePath: String
+    val channel: Int?
 )
 
 data class WifiNetwork(
@@ -56,7 +55,7 @@ object AirtoolsProtocol
         val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
         require(lines.size == 2) { "Unexpected /status response" }
         val first = lines[0]
-        require(first.startsWith("OK airtools=1 pid=")) { "Malformed /status response" }
+        require(first.startsWith("OK airtools=1 ")) { "Malformed /status response" }
         val pid = first.substringAfter("pid=").substringBefore(' ').toIntOrNull()
             ?: throw IllegalArgumentException("Invalid pid")
         val scanning = first.substringAfter(" scan=").substringBefore(' ').toIntOrNull()
@@ -81,8 +80,16 @@ object AirtoolsProtocol
             }
             else -> throw IllegalArgumentException("Invalid capture mode")
         }
+        val mode = when (first.substringAfter(" mode=", missingDelimiterValue = "").substringBefore(' '))
+        {
+            "scan" -> DeviceMode.SCAN
+            "capture" -> DeviceMode.CAPTURE
+            "idle" -> DeviceMode.IDLE
+            "" -> if (scanning == 1) DeviceMode.SCAN else if (pid > 0 && target is AirodumpTarget.Bssid) DeviceMode.CAPTURE else DeviceMode.IDLE
+            else -> throw IllegalArgumentException("Invalid device mode")
+        }
         require(lines[1].startsWith("state_path=") && lines[1].length > 11) { "Missing state path" }
-        return AirtoolsStatus(pid > 0, scanning == 1, pid, target, channel, lines[1].substringAfter("state_path="))
+        return AirtoolsStatus(mode, target, channel)
     }
 
     fun parseNetworks(text: String): List<WifiNetwork>
