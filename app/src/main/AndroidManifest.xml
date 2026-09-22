@@ -14,7 +14,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AIRTOOLS">
-        <activity android:name=".ScanActivity" android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

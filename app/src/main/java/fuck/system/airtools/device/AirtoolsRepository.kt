@@ -1,12 +1,12 @@
 package fuck.system.airtools.device
 
 import android.content.Context
-
 import java.net.URLEncoder
 
 class AirtoolsRepository(context: Context)
 {
     private val client = AirtoolsTcpClient(context.applicationContext)
+
     fun status(): AirtoolsStatus
     {
         val response = client.request("/status")
@@ -14,19 +14,12 @@ class AirtoolsRepository(context: Context)
         return AirtoolsProtocol.parseStatus(response.text)
     }
 
-    fun selectNetwork(network: WifiNetwork): AirtoolsResponse
-    {
-        val response = client.request(
-            "/set?mode=bssid&bssid=${query(network.bssid)}&channel=${network.channel}"
-        )
-        require(response.ok) { response.text.trim() }
-        return response
-    }
+    fun selectNetworkAndCapture(network: WifiNetwork): AirtoolsResponse = checked(
+        "/select?bssid=${query(network.bssid)}&channel=${network.channel}"
+    )
 
     fun start(): AirtoolsResponse = checked("/start")
-    fun stop(): AirtoolsResponse = checked("/stop")
     fun startNetworkScan(): AirtoolsResponse = checked("/scan/start")
-    fun stopNetworkScan(): AirtoolsResponse = checked("/scan/stop")
 
     fun networks(): List<WifiNetwork>
     {

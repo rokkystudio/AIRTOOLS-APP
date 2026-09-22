@@ -10,6 +10,18 @@
     android:paddingEnd="12dp"
     android:paddingBottom="13dp">
 
+    <ImageButton
+        android:id="@+id/backButton"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/bg_title_bar_button"
+        android:contentDescription="@string/back_to_networks"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_arrow_back"
+        android:stateListAnimator="@null"
+        android:visibility="gone" />
+
     <ImageView
         android:id="@+id/appIconImageView"
         android:layout_width="48dp"

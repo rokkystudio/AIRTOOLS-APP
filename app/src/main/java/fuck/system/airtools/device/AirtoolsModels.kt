@@ -20,6 +20,7 @@ data class AirtoolsStatus(
 data class WifiNetwork(
     val bssid: String,
     val channel: Int,
+    val signalDbm: Int?,
     val beacons: Long,
     val probes: Long,
     val dataFrames: Long,
@@ -89,23 +90,30 @@ object AirtoolsProtocol
         return text.lineSequence()
             .filter { it.isNotBlank() && !it.startsWith("OK ") && !it.startsWith("#") && !it.startsWith("ERR ") }
             .mapNotNull(::parseNetworkLine)
-            .sortedWith(compareByDescending<WifiNetwork> { it.beacons + it.probes + it.dataFrames }.thenBy { it.essid })
+            .sortedWith(
+                compareByDescending<WifiNetwork> { it.signalDbm ?: Int.MIN_VALUE }
+                    .thenByDescending { it.beacons + it.probes + it.dataFrames }
+                    .thenBy { it.essid }
+            )
             .toList()
     }
 
     private fun parseNetworkLine(line: String): WifiNetwork?
     {
-        val parts = line.split(',', limit = 6)
-        if (parts.size != 6 || !macRegex.matches(parts[0])) return null
+        val parts = line.split(',', limit = 7)
+        if (parts.size != 7 || !macRegex.matches(parts[0])) return null
         val channel = parts[1].toIntOrNull() ?: return null
         if (channel !in 1..14) return null
+        val rawSignal = parts[2].toIntOrNull() ?: return null
+        val signal = rawSignal.takeIf { it in -127..-1 }
         return WifiNetwork(
             bssid = parts[0],
             channel = channel,
-            beacons = parts[2].toLongOrNull() ?: return null,
-            probes = parts[3].toLongOrNull() ?: return null,
-            dataFrames = parts[4].toLongOrNull() ?: return null,
-            essid = parts[5]
+            signalDbm = signal,
+            beacons = parts[3].toLongOrNull() ?: return null,
+            probes = parts[4].toLongOrNull() ?: return null,
+            dataFrames = parts[5].toLongOrNull() ?: return null,
+            essid = parts[6]
         )
     }
 

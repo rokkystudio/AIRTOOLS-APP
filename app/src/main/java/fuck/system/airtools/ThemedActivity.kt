@@ -32,6 +32,7 @@ abstract class ThemedActivity : Activity()
     protected fun setupTopBar(binding: TopBarBinding, title: String)
     {
         binding.titleTextView.text = title
+        binding.backButton.visibility = android.view.View.GONE
         renderTopBarButtons(binding)
         binding.themeToggleButton.setOnClickListener {
             getSharedPreferences(PREFS_UI, MODE_PRIVATE).edit()
