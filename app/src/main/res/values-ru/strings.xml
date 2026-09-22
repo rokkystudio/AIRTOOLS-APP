@@ -21,9 +21,11 @@
     <string name="network_meta">Канал %1$d</string>
     <string name="signal_dbm">%1$d dBm · %2$d%%</string>
     <string name="signal_unknown">— dBm</string>
+    <string name="signal_offline">Offline</string>
     <string name="channel_value">Канал %1$d</string>
     <string name="signal_value">Сигнал %1$d dBm · %2$d%%</string>
     <string name="signal_value_unknown">Сигнал —</string>
+    <string name="signal_value_offline">Сигнал: Offline</string>
     <string name="capture_active">Захват активен</string>
     <string name="capture_counters">Beacon: %1$d\nProbe response: %2$d\nData-кадры: %3$d</string>
     <string name="handshake_title">WPA handshake</string>

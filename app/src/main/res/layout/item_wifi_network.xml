@@ -53,31 +53,27 @@
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="96dp"
+            android:layout_width="108dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="10dp"
             android:gravity="end"
             android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/networkSignalImageView"
+                android:layout_width="50dp"
+                android:layout_height="34dp"
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:id="@+id/networkSignalTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:includeFontPadding="false"
-                android:textColor="@color/accent"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <ProgressBar
-                android:id="@+id/networkSignalProgressBar"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="88dp"
-                android:layout_height="5dp"
-                android:layout_marginTop="7dp"
-                android:max="100"
-                android:progress="0"
-                android:progressBackgroundTint="@color/border_strong"
-                android:progressTint="@color/accent" />
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

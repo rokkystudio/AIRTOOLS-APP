@@ -23,7 +23,8 @@ data class WifiNetwork(
     val beacons: Long,
     val probes: Long,
     val dataFrames: Long,
-    val essid: String
+    val essid: String,
+    val online: Boolean = true
 )
 
 data class AirtoolsResponse(val command: String, val text: String)

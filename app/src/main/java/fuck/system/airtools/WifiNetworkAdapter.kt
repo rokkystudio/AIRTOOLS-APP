@@ -22,6 +22,7 @@ class WifiNetworkAdapter(private val context: Context) : BaseAdapter()
     override fun getCount(): Int = items.size
     override fun getItem(position: Int): WifiNetwork = items[position]
     override fun getItemId(position: Int): Long = position.toLong()
+    override fun isEnabled(position: Int): Boolean = getItem(position).online
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View
     {
@@ -31,30 +32,28 @@ class WifiNetworkAdapter(private val context: Context) : BaseAdapter()
             ItemWifiNetworkBinding.bind(convertView)
         }
         val network = getItem(position)
+        binding.root.alpha = if (network.online) 1.0f else 0.62f
         binding.networkNameTextView.text = if (network.essid == "<hidden/unknown>") {
             context.getString(R.string.hidden_network)
         } else {
             network.essid
         }
         binding.networkBssidTextView.text = network.bssid
-        binding.networkMetaTextView.text = context.getString(
-            R.string.network_meta,
-            network.channel
-        )
-        val signal = network.signalDbm
-        if (signal != null) {
-            val percent = signalPercent(signal)
-            binding.networkSignalTextView.text = context.getString(R.string.signal_dbm, signal, percent)
-            binding.networkSignalProgressBar.progress = percent
-            binding.networkSignalProgressBar.visibility = View.VISIBLE
-        } else {
-            binding.networkSignalTextView.text = context.getString(R.string.signal_unknown)
-            binding.networkSignalProgressBar.progress = 0
-            binding.networkSignalProgressBar.visibility = View.INVISIBLE
+        binding.networkMetaTextView.text = context.getString(R.string.network_meta, network.channel)
+
+        val level = WifiSignalLevel.from(network)
+        binding.networkSignalImageView.setImageResource(level.drawableRes)
+        binding.networkSignalTextView.text = when
+        {
+            !network.online -> context.getString(R.string.signal_offline)
+            network.signalDbm != null -> context.getString(
+                R.string.signal_dbm,
+                network.signalDbm,
+                signalPercent(network.signalDbm)
+            )
+            else -> context.getString(R.string.signal_unknown)
         }
+        binding.networkSignalImageView.contentDescription = binding.networkSignalTextView.text
         return binding.root
     }
-
-    private fun signalPercent(dbm: Int): Int = ((dbm + 100).coerceIn(0, 70) * 100 / 70)
-
 }

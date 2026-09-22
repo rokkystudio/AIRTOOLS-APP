@@ -183,16 +183,14 @@
                             android:textStyle="bold" />
                     </LinearLayout>
 
-                    <ProgressBar
-                        android:id="@+id/captureSignalProgressBar"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="5dp"
-                        android:layout_marginTop="12dp"
-                        android:max="100"
-                        android:progress="0"
-                        android:progressBackgroundTint="@color/border_strong"
-                        android:progressTint="@color/accent" />
+                    <ImageView
+                        android:id="@+id/captureSignalImageView"
+                        android:layout_width="52dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="end"
+                        android:layout_marginTop="10dp"
+                        android:adjustViewBounds="true"
+                        android:scaleType="fitCenter" />
                 </LinearLayout>
 
                 <LinearLayout

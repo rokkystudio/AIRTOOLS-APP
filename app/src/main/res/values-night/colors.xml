@@ -14,4 +14,11 @@
     <color name="status_disconnected">#FF8D949C</color>
     <color name="title_bar_button_pressed">#FF283F4D</color>
     <color name="button_pressed">#FF1D232A</color>
+    <color name="signal_excellent">#FF55C928</color>
+    <color name="signal_very_good">#FF78D94B</color>
+    <color name="signal_good">#FFF2C21A</color>
+    <color name="signal_fair">#FFF47A42</color>
+    <color name="signal_poor">#FFEF4B4B</color>
+    <color name="signal_outline">#FF8D949C</color>
+    <color name="signal_inactive_fill">#00000000</color>
 </resources>

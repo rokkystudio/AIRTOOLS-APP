@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="42dp"
+    android:height="30dp"
+    android:viewportWidth="40"
+    android:viewportHeight="28">
+    <path
+        android:fillColor="@color/signal_excellent"
+        android:pathData="M2,26 L7,26 L7,22 L2,22 Z"
+        android:strokeColor="@color/signal_outline"
+        android:strokeLineJoin="miter"
+        android:strokeWidth="1.2" />
+    <path
+        android:fillColor="@color/signal_excellent"
+        android:pathData="M9,26 L14,26 L14,18 L9,18 Z"
+        android:strokeColor="@color/signal_outline"
+        android:strokeLineJoin="miter"
+        android:strokeWidth="1.2" />
+    <path
+        android:fillColor="@color/signal_excellent"
+        android:pathData="M16,26 L21,26 L21,14 L16,14 Z"
+        android:strokeColor="@color/signal_outline"
+        android:strokeLineJoin="miter"
+        android:strokeWidth="1.2" />
+    <path
+        android:fillColor="@color/signal_excellent"
+        android:pathData="M23,26 L28,26 L28,10 L23,10 Z"
+        android:strokeColor="@color/signal_outline"
+        android:strokeLineJoin="miter"
+        android:strokeWidth="1.2" />
+    <path
+        android:fillColor="@color/signal_excellent"
+        android:pathData="M30,26 L35,26 L35,6 L30,6 Z"
+        android:strokeColor="@color/signal_outline"
+        android:strokeLineJoin="miter"
+        android:strokeWidth="1.2" />
+</vector>

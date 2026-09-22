@@ -17,6 +17,7 @@ class MainActivity : ThemedActivity()
     private lateinit var binding: ActivityMainBinding
     private lateinit var repository: AirtoolsRepository
     private lateinit var networkAdapter: WifiNetworkAdapter
+    private val signalTracker = WifiSignalTracker()
 
     @Volatile private var monitorGeneration = 0
     @Volatile private var commandInProgress = false
@@ -82,7 +83,7 @@ class MainActivity : ThemedActivity()
                     try {
                         when (status.mode)
                         {
-                            DeviceMode.SCAN -> repository.networks().let { updateScanning(generation, it) }
+                            DeviceMode.SCAN -> signalTracker.update(repository.networks()).let { updateScanning(generation, it) }
                             DeviceMode.CAPTURE -> updateCapture(generation, status)
                             DeviceMode.IDLE -> repository.startNetworkScan()
                         }
@@ -133,7 +134,7 @@ class MainActivity : ThemedActivity()
     private fun updateCapture(generation: Int, status: AirtoolsStatus)
     {
         val target = status.target as AirodumpTarget.Bssid
-        val networks = runCatching { repository.networks() }.getOrDefault(emptyList())
+        val networks = signalTracker.update(runCatching { repository.networks() }.getOrDefault(emptyList()))
         val live = networks.firstOrNull { it.bssid.equals(target.value, ignoreCase = true) }
         val cached = selectedNetwork?.takeIf { it.bssid.equals(target.value, ignoreCase = true) }
             ?: loadSelectedNetwork()?.takeIf { it.bssid.equals(target.value, ignoreCase = true) }
@@ -210,7 +211,7 @@ class MainActivity : ThemedActivity()
             try
             {
                 repository.startNetworkScan()
-                val networks = runCatching { repository.networks() }.getOrDefault(emptyList())
+                val networks = signalTracker.update(runCatching { repository.networks() }.getOrDefault(emptyList()))
                 runOnUiThread {
                     renderConnection(ConnectionState.CONNECTED)
                     renderScreen(Screen.SCAN)
@@ -268,10 +269,15 @@ class MainActivity : ThemedActivity()
         binding.captureNetworkNameTextView.text = displayEssid(network)
         binding.captureBssidTextView.text = network.bssid
         binding.captureChannelTextView.text = getString(R.string.channel_value, network.channel)
-        binding.captureSignalTextView.text = network.signalDbm?.let { getString(R.string.signal_value, it, signalPercent(it)) }
-            ?: getString(R.string.signal_value_unknown)
-        binding.captureSignalProgressBar.progress = network.signalDbm?.let(::signalPercent) ?: 0
-        binding.captureSignalProgressBar.visibility = if (network.signalDbm == null) View.INVISIBLE else View.VISIBLE
+        val signalLevel = WifiSignalLevel.from(network)
+        binding.captureSignalImageView.setImageResource(signalLevel.drawableRes)
+        binding.captureSignalTextView.text = when
+        {
+            !network.online -> getString(R.string.signal_value_offline)
+            network.signalDbm != null -> getString(R.string.signal_value, network.signalDbm, signalPercent(network.signalDbm))
+            else -> getString(R.string.signal_value_unknown)
+        }
+        binding.captureSignalImageView.contentDescription = binding.captureSignalTextView.text
         binding.captureCountersTextView.text = getString(
             R.string.capture_counters,
             network.beacons,
@@ -290,8 +296,6 @@ class MainActivity : ThemedActivity()
             )
         }
     }
-
-    private fun signalPercent(dbm: Int): Int = ((dbm + 100).coerceIn(0, 70) * 100 / 70)
 
     private fun displayEssid(network: WifiNetwork): String =
         if (network.essid == "<hidden/unknown>") getString(R.string.hidden_network) else network.essid
