@@ -1,8 +1,17 @@
 package fuck.system.airtools
 
+import android.content.ContentValues
 import android.content.res.ColorStateList
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.view.View
+import android.widget.Toast
+import java.io.File
+import java.io.OutputStream
+import java.text.DateFormat
+import java.util.Date
 import fuck.system.airtools.databinding.ActivityMainBinding
 import fuck.system.airtools.device.AirodumpTarget
 import fuck.system.airtools.device.AirtoolsRepository
@@ -12,6 +21,7 @@ import fuck.system.airtools.device.DeviceMode
 import fuck.system.airtools.device.WifiNetwork
 import kotlin.concurrent.thread
 
+/** Presents the device connection, network scan, capture details, and saved handshake actions. */
 class MainActivity : ThemedActivity()
 {
     private lateinit var binding: ActivityMainBinding
@@ -25,6 +35,9 @@ class MainActivity : ThemedActivity()
     private var connectedOnce = false
     private var currentScreen = Screen.CONNECTING
     private var selectedNetwork: WifiNetwork? = null
+    private var replayStatusText: String? = null
+    private val captureDateFormat: DateFormat by lazy { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM) }
+    private val capturedHandshakes = mutableMapOf<String, HandshakeIndexEntry>()
 
     override fun onCreate(savedInstanceState: Bundle?)
     {
@@ -40,6 +53,8 @@ class MainActivity : ThemedActivity()
             selectNetwork(networkAdapter.getItem(position))
         }
         binding.topBar.backButton.setOnClickListener { returnToNetworkSelection() }
+        binding.replayButton.setOnClickListener { startReplay() }
+        binding.handshakeDownloadButton.setOnClickListener { downloadHandshake() }
 
         selectedNetwork = loadSelectedNetwork()
         renderConnection(ConnectionState.CONNECTING)
@@ -91,7 +106,7 @@ class MainActivity : ThemedActivity()
                         // /status succeeded: keep the device connected and retry mode data next poll.
                     }
                 }
-                catch (_: Throwable)
+                catch (error: Throwable)
                 {
                     consecutiveFailures++
                     if (!connectedOnce || consecutiveFailures >= FAILURE_THRESHOLD)
@@ -131,6 +146,7 @@ class MainActivity : ThemedActivity()
         }
     }
 
+    /** Refreshes the selected network details and retains the newest handshake entry for its BSSID. */
     private fun updateCapture(generation: Int, status: AirtoolsStatus)
     {
         val target = status.target as AirodumpTarget.Bssid
@@ -139,15 +155,37 @@ class MainActivity : ThemedActivity()
         val cached = selectedNetwork?.takeIf { it.bssid.equals(target.value, ignoreCase = true) }
             ?: loadSelectedNetwork()?.takeIf { it.bssid.equals(target.value, ignoreCase = true) }
         val network = mergeNetwork(live, cached, target.value, status.channel ?: cached?.channel ?: 0)
-        val handshakes = runCatching { repository.handshakes().second }.getOrDefault(emptyList())
+        val latestHandshake = runCatching { repository.handshakes().second }.getOrDefault(emptyList())
             .filter { it.bssid.equals(target.value, ignoreCase = true) }
+            .maxByOrNull { it.storedTick }
+        val handshake = synchronized(capturedHandshakes) {
+            val key = target.value.lowercase()
+            val previous = capturedHandshakes[key]
+            if (latestHandshake != null && (previous == null || latestHandshake.storedTick > previous.storedTick)) {
+                capturedHandshakes[key] = rememberHandshakeTimestamp(latestHandshake)
+            }
+            capturedHandshakes[key]
+        }
         runOnUiThread {
             if (generation != monitorGeneration) return@runOnUiThread
             selectedNetwork = network
             renderConnection(ConnectionState.CONNECTED)
             renderScreen(Screen.CAPTURE)
-            renderCapture(network, handshakes.maxByOrNull { it.storedTick })
+            renderCapture(network, handshake)
         }
+    }
+
+    /** Assigns a stable Android-side capture time when firmware cannot provide a valid wall clock. */
+    private fun rememberHandshakeTimestamp(handshake: HandshakeIndexEntry): HandshakeIndexEntry
+    {
+        val key = "handshake_at_${handshake.bssid.lowercase()}_${handshake.storedTick}"
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        val stored = prefs.getLong(key, 0L).takeIf { it > 0L }
+        val capturedAt = handshake.capturedAtMillis ?: stored ?: System.currentTimeMillis()
+        if (stored == null) {
+            prefs.edit().putLong(key, capturedAt).apply()
+        }
+        return handshake.copy(capturedAtMillis = capturedAt)
     }
 
     private fun mergeNetwork(live: WifiNetwork?, cached: WifiNetwork?, bssid: String, channel: Int): WifiNetwork
@@ -264,6 +302,7 @@ class MainActivity : ThemedActivity()
         }
     }
 
+    /** Renders capture counters, signal details, and the available handshake action. */
     private fun renderCapture(network: WifiNetwork, handshake: HandshakeIndexEntry?)
     {
         binding.captureNetworkNameTextView.text = displayEssid(network)
@@ -284,6 +323,10 @@ class MainActivity : ThemedActivity()
             network.probes,
             network.dataFrames
         )
+        binding.replayButton.isEnabled = !commandInProgress
+        binding.replayStatusTextView.text = replayStatusText ?: getString(R.string.replay_hint)
+        binding.handshakeDownloadButton.visibility = if (handshake == null) View.GONE else View.VISIBLE
+        binding.handshakeDownloadButton.isEnabled = handshake != null && !commandInProgress
         if (handshake == null) {
             binding.handshakeStatusTextView.setTextColor(getColor(R.color.text_secondary))
             binding.handshakeStatusTextView.text = getString(R.string.handshake_waiting)
@@ -292,8 +335,121 @@ class MainActivity : ThemedActivity()
             binding.handshakeStatusTextView.text = getString(
                 R.string.handshake_captured,
                 handshake.frameCount,
-                handshake.file
+                handshake.capturedAtMillis?.let { captureDateFormat.format(Date(it)) } ?: getString(R.string.handshake_time_unknown),
+                handshake.fileName
             )
+        }
+    }
+
+    /** Starts the device replay command for five deauth packets on the active capture target. */
+    private fun startReplay()
+    {
+        if (commandInProgress) return
+        val network = selectedNetwork ?: return
+        commandInProgress = true
+        replayStatusText = getString(R.string.replay_running)
+        binding.replayButton.isEnabled = false
+        binding.handshakeDownloadButton.isEnabled = false
+        binding.replayStatusTextView.text = replayStatusText
+        thread(name = "airtools-replay") {
+            try
+            {
+                repository.replay()
+                replayStatusText = getString(R.string.replay_started, network.bssid)
+            }
+            catch (error: Throwable)
+            {
+                replayStatusText = getString(R.string.replay_failed, error.message ?: "")
+            }
+            finally
+            {
+                commandInProgress = false
+                runOnUiThread {
+                    val currentNetwork = selectedNetwork
+                    val currentHandshake = currentNetwork?.let { item ->
+                        synchronized(capturedHandshakes) { capturedHandshakes[item.bssid.lowercase()] }
+                    }
+                    if (currentNetwork != null) renderCapture(currentNetwork, currentHandshake)
+                }
+            }
+        }
+    }
+
+    /** Downloads the selected handshake and reports the saved file result. */
+    private fun downloadHandshake()
+    {
+        if (commandInProgress) return
+        val network = selectedNetwork ?: return
+        val handshake = synchronized(capturedHandshakes) { capturedHandshakes[network.bssid.lowercase()] } ?: return
+        commandInProgress = true
+        binding.replayButton.isEnabled = false
+        binding.handshakeDownloadButton.isEnabled = false
+        binding.handshakeStatusTextView.setTextColor(getColor(R.color.text_secondary))
+        binding.handshakeStatusTextView.text = getString(R.string.handshake_downloading)
+        thread(name = "airtools-handshake-download") {
+            val fileName = handshake.fileName
+            try
+            {
+                saveHandshakeFile(fileName) { output -> repository.downloadHandshake(fileName, output) }
+                runOnUiThread {
+                    Toast.makeText(this, getString(R.string.handshake_downloaded, fileName), Toast.LENGTH_SHORT).show()
+                }
+            }
+            catch (error: Throwable)
+            {
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.handshake_download_failed, error.message ?: ""),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+            finally
+            {
+                commandInProgress = false
+                runOnUiThread {
+                    val currentNetwork = selectedNetwork
+                    val currentHandshake = currentNetwork?.let { item ->
+                        synchronized(capturedHandshakes) { capturedHandshakes[item.bssid.lowercase()] }
+                    }
+                    if (currentNetwork != null) renderCapture(currentNetwork, currentHandshake)
+                    else binding.handshakeDownloadButton.isEnabled = true
+                }
+            }
+        }
+    }
+
+    /** Saves a streamed handshake PCAP in Downloads/Airtools or app-specific Downloads on older Android. */
+    private fun saveHandshakeFile(fileName: String, writer: (OutputStream) -> Long): Long
+    {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                put(MediaStore.Downloads.MIME_TYPE, "application/vnd.tcpdump.pcap")
+                put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Airtools")
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("Could not create the Downloads file")
+            try
+            {
+                val bytes = contentResolver.openOutputStream(uri)?.use(writer)
+                    ?: throw IllegalStateException("Could not open the Downloads file")
+                contentResolver.update(uri, ContentValues().apply {
+                    put(MediaStore.Downloads.IS_PENDING, 0)
+                }, null, null)
+                return bytes
+            }
+            catch (error: Throwable)
+            {
+                contentResolver.delete(uri, null, null)
+                throw error
+            }
+        } else {
+            val directory = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Airtools")
+            check(directory.mkdirs() || directory.isDirectory) { "Could not create the Downloads folder" }
+            return File(directory, fileName).outputStream().use(writer)
         }
     }
 

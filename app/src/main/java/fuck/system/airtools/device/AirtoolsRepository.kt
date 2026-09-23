@@ -1,11 +1,14 @@
 package fuck.system.airtools.device
 
 import android.content.Context
+import java.io.OutputStream
 import java.net.URLEncoder
 
+/** Provides typed access to the AIRTOOLS TCP API, including handshake PCAP downloads. */
 class AirtoolsRepository(context: Context)
 {
     private val client = AirtoolsTcpClient(context.applicationContext)
+    private val handshakeFilePattern = Regex("^[0-9A-Fa-f]{12}\\.pcap$")
 
     fun status(): AirtoolsStatus
     {
@@ -33,6 +36,16 @@ class AirtoolsRepository(context: Context)
         val response = checked("/handshakes")
         return response to AirtoolsProtocol.parseHandshakeIndex(response.text)
     }
+
+    /** Streams the PCAP file indexed for the selected handshake entry into the caller's output. */
+    fun downloadHandshake(file: String, output: OutputStream): Long
+    {
+        require(handshakeFilePattern.matches(file)) { "Invalid handshake file name" }
+        return client.download("/handshake/download?file=${query(file)}", output)
+    }
+
+    /** Runs five deauth replay packets against the device's current capture BSSID. */
+    fun replay(): AirtoolsResponse = checked("/replay")
 
     fun aireplayTest(count: Int = 1): AirtoolsResponse =
         checked("/aireplay?mode=test&count=${count.coerceIn(1, 128)}")

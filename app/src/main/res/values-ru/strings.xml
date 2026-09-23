@@ -30,4 +30,15 @@
     <string name="capture_counters">Beacon: %1$d\nProbe response: %2$d\nData-кадры: %3$d</string>
     <string name="handshake_title">WPA handshake</string>
     <string name="handshake_waiting">Ожидание handshake…</string>
-    <string name="handshake_captured">Получен • кадров: %1$d\n%2$s</string></resources>
+    <string name="handshake_captured">Получен • кадров: %1$d\nВремя: %2$s\n%3$s</string>
+    <string name="handshake_time_unknown">время неизвестно</string>
+    <string name="download_handshake">Скачать handshake</string>
+    <string name="handshake_downloading">Скачивание handshake…</string>
+    <string name="handshake_downloaded">Сохранено в Downloads/Airtools: %1$s</string>
+    <string name="handshake_download_failed">Не удалось сохранить handshake: %1$s</string>
+    <string name="replay_button">REPLAY</string>
+    <string name="replay_hint">Отправляет aireplay -0 5 по выбранной сети.</string>
+    <string name="replay_running">Отправка replay…</string>
+    <string name="replay_started">Replay отправлен по %1$s</string>
+    <string name="replay_failed">Replay не выполнен: %1$s</string>
+</resources>

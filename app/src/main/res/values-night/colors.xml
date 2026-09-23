@@ -19,6 +19,6 @@
     <color name="signal_good">#FFF2C21A</color>
     <color name="signal_fair">#FFF47A42</color>
     <color name="signal_poor">#FFEF4B4B</color>
-    <color name="signal_outline">#FF202124</color>
+    <color name="signal_outline">#FF5F6368</color>
     <color name="signal_inactive_fill">#00000000</color>
 </resources>

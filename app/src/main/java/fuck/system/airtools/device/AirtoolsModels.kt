@@ -32,13 +32,19 @@ data class AirtoolsResponse(val command: String, val text: String)
     val ok: Boolean get() = text.startsWith("OK")
 }
 
+/** One saved WPA handshake entry reported by the device index. */
 data class HandshakeIndexEntry(
     val bssid: String,
     val storedTick: Long,
     val frameCount: Int,
     val file: String,
-    val essid: String
+    val essid: String,
+    val capturedAtMillis: Long? = null
 )
+{
+    /** Safe file name used for the download endpoint and phone storage. */
+    val fileName: String get() = file.substringAfterLast('/')
+}
 
 sealed class AireplayRequest
 {
@@ -125,19 +131,34 @@ object AirtoolsProtocol
         )
     }
 
+    /** Parses both legacy and timestamped handshake indexes. */
     fun parseHandshakeIndex(text: String): List<HandshakeIndexEntry>
     {
         return text.lineSequence()
             .filter { it.isNotBlank() && !it.startsWith("OK ") && !it.startsWith("#") }
             .mapNotNull { line ->
-                val parts = line.split(',', limit = 5)
-                if (parts.size < 5) null else HandshakeIndexEntry(
-                    parts[0],
-                    parts[1].toLongOrNull() ?: return@mapNotNull null,
-                    parts[2].toIntOrNull() ?: return@mapNotNull null,
-                    parts[3],
-                    parts[4]
-                )
+                val parts = line.split(',', limit = 6)
+                if (parts.size >= 6) {
+                    val capturedEpoch = parts[2].toLongOrNull() ?: return@mapNotNull null
+                    HandshakeIndexEntry(
+                        bssid = parts[0],
+                        storedTick = parts[1].toLongOrNull() ?: return@mapNotNull null,
+                        frameCount = parts[3].toIntOrNull() ?: return@mapNotNull null,
+                        file = parts[4].substringAfterLast('/'),
+                        essid = parts[5],
+                        capturedAtMillis = capturedEpoch.takeIf { it > 0L }?.times(1000L)
+                    )
+                } else if (parts.size >= 5) {
+                    HandshakeIndexEntry(
+                        bssid = parts[0],
+                        storedTick = parts[1].toLongOrNull() ?: return@mapNotNull null,
+                        frameCount = parts[2].toIntOrNull() ?: return@mapNotNull null,
+                        file = parts[3].substringAfterLast('/'),
+                        essid = parts[4]
+                    )
+                } else {
+                    null
+                }
             }
             .toList()
     }
