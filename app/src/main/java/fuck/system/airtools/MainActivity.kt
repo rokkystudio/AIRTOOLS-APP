@@ -472,12 +472,13 @@ class MainActivity : ThemedActivity()
         binding.handshakeStatusTextView.setTextColor(getColor(R.color.text_secondary))
         binding.handshakeStatusTextView.text = getString(R.string.handshake_downloading)
         thread(name = "airtools-handshake-download") {
-            val fileName = handshake.fileName
+            val deviceFileName = handshake.fileName
+            val phoneFileName = handshakePhoneFileName(network, handshake)
             try
             {
-                saveHandshakeFile(fileName) { output -> repository.downloadHandshake(fileName, output) }
+                saveHandshakeFile(phoneFileName) { output -> repository.downloadHandshake(deviceFileName, output) }
                 runOnUiThread {
-                    Toast.makeText(this, getString(R.string.handshake_downloaded, fileName), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.handshake_downloaded, phoneFileName), Toast.LENGTH_SHORT).show()
                 }
             }
             catch (error: Throwable)
@@ -503,6 +504,22 @@ class MainActivity : ThemedActivity()
                 }
             }
         }
+    }
+
+    /** Returns the phone storage PCAP name, including the selected network name and preserving the device file token. */
+    private fun handshakePhoneFileName(network: WifiNetwork, handshake: HandshakeIndexEntry): String
+    {
+        val networkName = when
+        {
+            network.essid.isNotBlank() && network.essid != "<hidden/unknown>" -> network.essid
+            handshake.essid.isNotBlank() && handshake.essid != "<hidden/unknown>" -> handshake.essid
+            else -> "hidden_network_${network.bssid.replace(":", "")}"
+        }
+        val safeNetworkName = networkName
+            .replace(Regex("[\\\\/:*?\"<>|%\\p{Cntrl}]"), "_")
+            .trim(' ', '.')
+            .ifBlank { "network_${network.bssid.replace(":", "")}" }
+        return "${safeNetworkName}_${handshake.fileName}"
     }
 
     /** Saves a streamed handshake PCAP in Downloads/Airtools or app-specific Downloads on older Android. */
