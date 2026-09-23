@@ -1,5 +1,6 @@
 package fuck.system.airtools
 
+import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.res.ColorStateList
 import android.os.Build
@@ -8,7 +9,6 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -362,7 +362,7 @@ class MainActivity : ThemedActivity()
         clients.forEach { client -> binding.clientsContainer.addView(createClientRow(client)) }
     }
 
-    /** Builds one connected-client row with a PC icon and icon-only replay button. */
+    /** Builds one connected-client row; tapping it asks before starting deauth replay. */
     private fun createClientRow(client: WifiClient): View
     {
         val density = resources.displayMetrics.density
@@ -374,6 +374,13 @@ class MainActivity : ThemedActivity()
             ).apply { topMargin = dp(10) }
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
+            isClickable = true
+            isFocusable = true
+            isEnabled = !commandInProgress
+            alpha = if (commandInProgress) 0.55f else 1f
+            setPadding(0, dp(8), 0, dp(8))
+            contentDescription = getString(R.string.replay_client_content_description, client.station)
+            setOnClickListener { confirmReplay(client) }
         }
         val icon = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(34), dp(34))
@@ -401,20 +408,21 @@ class MainActivity : ThemedActivity()
             setTextColor(getColor(R.color.text_secondary))
             textSize = 12f
         })
-        val replay = ImageButton(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
-            setBackgroundResource(R.drawable.bg_title_bar_button)
-            setImageResource(R.drawable.ic_replay_antenna)
-            imageTintList = ColorStateList.valueOf(getColor(R.color.text_primary))
-            contentDescription = getString(R.string.replay_client, client.station)
-            isEnabled = !commandInProgress
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            setOnClickListener { startReplay(client) }
-        }
         row.addView(icon)
         row.addView(textColumn)
-        row.addView(replay)
         return row
+    }
+
+    /** Asks before starting aireplay -0 5 for a concrete client station. */
+    private fun confirmReplay(client: WifiClient)
+    {
+        if (commandInProgress) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.replay_dialog_title)
+            .setMessage(getString(R.string.replay_dialog_message, client.station))
+            .setPositiveButton(R.string.replay_dialog_confirm) { _, _ -> startReplay(client) }
+            .setNegativeButton(R.string.replay_dialog_cancel, null)
+            .show()
     }
 
     /** Starts aireplay -0 5 for a concrete client station on the active capture target. */

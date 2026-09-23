@@ -39,7 +39,11 @@
     <string name="client_icon">Client PC</string>
     <string name="client_meta">%1$d frames • %2$s</string>
     <string name="signal_dbm_only">%1$d dBm</string>
-    <string name="replay_client">Replay to %1$s</string>
+    <string name="replay_client_content_description">Aireplay deauth for %1$s</string>
+    <string name="replay_dialog_title">Aireplay Deauth</string>
+    <string name="replay_dialog_message">Run Aireplay Deauth against %1$s?</string>
+    <string name="replay_dialog_confirm">Run</string>
+    <string name="replay_dialog_cancel">Cancel</string>
     <string name="replay_running">Sending replay…</string>
     <string name="replay_started">Replay sent to %1$s</string>
     <string name="replay_failed">Replay failed: %1$s</string>

@@ -41,7 +41,11 @@
     <string name="client_icon">Компьютер клиента</string>
     <string name="client_meta">кадров: %1$d • %2$s</string>
     <string name="signal_dbm_only">%1$d dBm</string>
-    <string name="replay_client">Replay на %1$s</string>
+    <string name="replay_client_content_description">Aireplay deauth для %1$s</string>
+    <string name="replay_dialog_title">Aireplay Deauth</string>
+    <string name="replay_dialog_message">Выполнить Aireplay Deauth для %1$s?</string>
+    <string name="replay_dialog_confirm">Выполнить</string>
+    <string name="replay_dialog_cancel">Отмена</string>
     <string name="replay_running">Отправка replay…</string>
     <string name="replay_started">Replay отправлен на %1$s</string>
     <string name="replay_failed">Replay не выполнен: %1$s</string>
