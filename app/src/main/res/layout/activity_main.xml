@@ -228,21 +228,30 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
-                    <Button
-                        android:id="@+id/replayButton"
+                    <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/replay_button" />
+                        android:includeFontPadding="false"
+                        android:text="@string/clients_title"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/replayStatusTextView"
+                        android:id="@+id/clientsEmptyTextView"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:includeFontPadding="false"
-                        android:text="@string/replay_hint"
+                        android:text="@string/clients_empty"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
+
+                    <LinearLayout
+                        android:id="@+id/clientsContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
                 </LinearLayout>
 
                 <LinearLayout

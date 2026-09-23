@@ -6,7 +6,12 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.view.Gravity
 import android.view.View
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import java.io.File
 import java.io.OutputStream
@@ -18,6 +23,7 @@ import fuck.system.airtools.device.AirtoolsRepository
 import fuck.system.airtools.device.AirtoolsStatus
 import fuck.system.airtools.device.HandshakeIndexEntry
 import fuck.system.airtools.device.DeviceMode
+import fuck.system.airtools.device.WifiClient
 import fuck.system.airtools.device.WifiNetwork
 import kotlin.concurrent.thread
 
@@ -35,7 +41,7 @@ class MainActivity : ThemedActivity()
     private var connectedOnce = false
     private var currentScreen = Screen.CONNECTING
     private var selectedNetwork: WifiNetwork? = null
-    private var replayStatusText: String? = null
+    private var currentClients: List<WifiClient> = emptyList()
     private val captureDateFormat: DateFormat by lazy { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM) }
     private val capturedHandshakes = mutableMapOf<String, HandshakeIndexEntry>()
 
@@ -53,7 +59,6 @@ class MainActivity : ThemedActivity()
             selectNetwork(networkAdapter.getItem(position))
         }
         binding.topBar.backButton.setOnClickListener { returnToNetworkSelection() }
-        binding.replayButton.setOnClickListener { startReplay() }
         binding.handshakeDownloadButton.setOnClickListener { downloadHandshake() }
 
         selectedNetwork = loadSelectedNetwork()
@@ -146,7 +151,7 @@ class MainActivity : ThemedActivity()
         }
     }
 
-    /** Refreshes the selected network details and retains the newest handshake entry for its BSSID. */
+    /** Refreshes the selected network, connected clients, and newest handshake entry for its BSSID. */
     private fun updateCapture(generation: Int, status: AirtoolsStatus)
     {
         val target = status.target as AirodumpTarget.Bssid
@@ -155,30 +160,37 @@ class MainActivity : ThemedActivity()
         val cached = selectedNetwork?.takeIf { it.bssid.equals(target.value, ignoreCase = true) }
             ?: loadSelectedNetwork()?.takeIf { it.bssid.equals(target.value, ignoreCase = true) }
         val network = mergeNetwork(live, cached, target.value, status.channel ?: cached?.channel ?: 0)
+        val clients = runCatching { repository.clients() }.getOrDefault(emptyList())
+            .filter { it.bssid.equals(target.value, ignoreCase = true) }
         val latestHandshake = runCatching { repository.handshakes().second }.getOrDefault(emptyList())
             .filter { it.bssid.equals(target.value, ignoreCase = true) }
-            .maxByOrNull { it.storedTick }
+            .sortedWith(compareBy<HandshakeIndexEntry> { it.storedTick }.thenBy { it.generation })
+            .lastOrNull()
         val handshake = synchronized(capturedHandshakes) {
             val key = target.value.lowercase()
             val previous = capturedHandshakes[key]
-            if (latestHandshake != null && (previous == null || latestHandshake.storedTick > previous.storedTick)) {
-                capturedHandshakes[key] = rememberHandshakeTimestamp(latestHandshake)
+            val isNewer = latestHandshake != null && (
+                previous == null || latestHandshake.storedTick > previous.storedTick ||
+                    (latestHandshake.storedTick == previous.storedTick && latestHandshake.generation > previous.generation)
+                )
+            if (isNewer) {
+                capturedHandshakes[key] = rememberHandshakeTimestamp(latestHandshake!!)
             }
             capturedHandshakes[key]
         }
         runOnUiThread {
             if (generation != monitorGeneration) return@runOnUiThread
             selectedNetwork = network
+            currentClients = clients
             renderConnection(ConnectionState.CONNECTED)
             renderScreen(Screen.CAPTURE)
-            renderCapture(network, handshake)
+            renderCapture(network, handshake, clients)
         }
     }
 
-    /** Assigns a stable Android-side capture time when firmware cannot provide a valid wall clock. */
     private fun rememberHandshakeTimestamp(handshake: HandshakeIndexEntry): HandshakeIndexEntry
     {
-        val key = "handshake_at_${handshake.bssid.lowercase()}_${handshake.storedTick}"
+        val key = "handshake_at_${handshake.bssid.lowercase()}_${handshake.storedTick}_${handshake.generation}"
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         val stored = prefs.getLong(key, 0L).takeIf { it > 0L }
         val capturedAt = handshake.capturedAtMillis ?: stored ?: System.currentTimeMillis()
@@ -220,7 +232,8 @@ class MainActivity : ThemedActivity()
                 runOnUiThread {
                     renderConnection(ConnectionState.CONNECTED)
                     renderScreen(Screen.CAPTURE)
-                    renderCapture(network, null)
+                    currentClients = emptyList()
+                    renderCapture(network, null, currentClients)
                 }
                 if (status.mode == DeviceMode.CAPTURE && status.target is AirodumpTarget.Bssid) {
                     consecutiveFailures = 0
@@ -302,8 +315,8 @@ class MainActivity : ThemedActivity()
         }
     }
 
-    /** Renders capture counters, signal details, and the available handshake action. */
-    private fun renderCapture(network: WifiNetwork, handshake: HandshakeIndexEntry?)
+    /** Renders capture counters, signal details, connected clients, and the available handshake action. */
+    private fun renderCapture(network: WifiNetwork, handshake: HandshakeIndexEntry?, clients: List<WifiClient> = currentClients)
     {
         binding.captureNetworkNameTextView.text = displayEssid(network)
         binding.captureBssidTextView.text = network.bssid
@@ -323,8 +336,7 @@ class MainActivity : ThemedActivity()
             network.probes,
             network.dataFrames
         )
-        binding.replayButton.isEnabled = !commandInProgress
-        binding.replayStatusTextView.text = replayStatusText ?: getString(R.string.replay_hint)
+        renderClients(clients)
         binding.handshakeDownloadButton.visibility = if (handshake == null) View.GONE else View.VISIBLE
         binding.handshakeDownloadButton.isEnabled = handshake != null && !commandInProgress
         if (handshake == null) {
@@ -335,31 +347,96 @@ class MainActivity : ThemedActivity()
             binding.handshakeStatusTextView.text = getString(
                 R.string.handshake_captured,
                 handshake.frameCount,
+                handshake.generation,
                 handshake.capturedAtMillis?.let { captureDateFormat.format(Date(it)) } ?: getString(R.string.handshake_time_unknown),
                 handshake.fileName
             )
         }
     }
 
-    /** Starts the device replay command for five deauth packets on the active capture target. */
-    private fun startReplay()
+    /** Renders connected client stations with per-client replay actions. */
+    private fun renderClients(clients: List<WifiClient>)
+    {
+        binding.clientsContainer.removeAllViews()
+        binding.clientsEmptyTextView.visibility = if (clients.isEmpty()) View.VISIBLE else View.GONE
+        clients.forEach { client -> binding.clientsContainer.addView(createClientRow(client)) }
+    }
+
+    /** Builds one connected-client row with a PC icon and icon-only replay button. */
+    private fun createClientRow(client: WifiClient): View
+    {
+        val density = resources.displayMetrics.density
+        fun dp(value: Int): Int = (value * density).toInt()
+        val row = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(10) }
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val icon = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(34), dp(34))
+            setImageResource(R.drawable.ic_client_pc)
+            contentDescription = getString(R.string.client_icon)
+        }
+        val textColumn = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                leftMargin = dp(12)
+                rightMargin = dp(12)
+            }
+            orientation = LinearLayout.VERTICAL
+        }
+        textColumn.addView(TextView(this).apply {
+            includeFontPadding = false
+            text = client.station
+            setTextColor(getColor(R.color.text_primary))
+            textSize = 14f
+            typeface = android.graphics.Typeface.MONOSPACE
+        })
+        val signal = client.signalDbm?.let { getString(R.string.signal_dbm_only, it) } ?: getString(R.string.signal_unknown)
+        textColumn.addView(TextView(this).apply {
+            includeFontPadding = false
+            text = getString(R.string.client_meta, client.frames, signal)
+            setTextColor(getColor(R.color.text_secondary))
+            textSize = 12f
+        })
+        val replay = ImageButton(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            setBackgroundResource(R.drawable.bg_title_bar_button)
+            setImageResource(R.drawable.ic_replay_antenna)
+            imageTintList = ColorStateList.valueOf(getColor(R.color.text_primary))
+            contentDescription = getString(R.string.replay_client, client.station)
+            isEnabled = !commandInProgress
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setOnClickListener { startReplay(client) }
+        }
+        row.addView(icon)
+        row.addView(textColumn)
+        row.addView(replay)
+        return row
+    }
+
+    /** Starts aireplay -0 5 for a concrete client station on the active capture target. */
+    private fun startReplay(client: WifiClient)
     {
         if (commandInProgress) return
-        val network = selectedNetwork ?: return
         commandInProgress = true
-        replayStatusText = getString(R.string.replay_running)
-        binding.replayButton.isEnabled = false
-        binding.handshakeDownloadButton.isEnabled = false
-        binding.replayStatusTextView.text = replayStatusText
+        renderClients(currentClients)
+        Toast.makeText(this, getString(R.string.replay_running), Toast.LENGTH_SHORT).show()
         thread(name = "airtools-replay") {
             try
             {
-                repository.replay()
-                replayStatusText = getString(R.string.replay_started, network.bssid)
+                repository.replay(client.station)
+                runOnUiThread {
+                    Toast.makeText(this, getString(R.string.replay_started, client.station), Toast.LENGTH_SHORT).show()
+                }
             }
             catch (error: Throwable)
             {
-                replayStatusText = getString(R.string.replay_failed, error.message ?: "")
+                runOnUiThread {
+                    Toast.makeText(this, getString(R.string.replay_failed, error.message ?: ""), Toast.LENGTH_LONG).show()
+                }
             }
             finally
             {
@@ -369,7 +446,7 @@ class MainActivity : ThemedActivity()
                     val currentHandshake = currentNetwork?.let { item ->
                         synchronized(capturedHandshakes) { capturedHandshakes[item.bssid.lowercase()] }
                     }
-                    if (currentNetwork != null) renderCapture(currentNetwork, currentHandshake)
+                    if (currentNetwork != null) renderCapture(currentNetwork, currentHandshake, currentClients)
                 }
             }
         }
@@ -382,7 +459,7 @@ class MainActivity : ThemedActivity()
         val network = selectedNetwork ?: return
         val handshake = synchronized(capturedHandshakes) { capturedHandshakes[network.bssid.lowercase()] } ?: return
         commandInProgress = true
-        binding.replayButton.isEnabled = false
+        renderClients(currentClients)
         binding.handshakeDownloadButton.isEnabled = false
         binding.handshakeStatusTextView.setTextColor(getColor(R.color.text_secondary))
         binding.handshakeStatusTextView.text = getString(R.string.handshake_downloading)
@@ -413,7 +490,7 @@ class MainActivity : ThemedActivity()
                     val currentHandshake = currentNetwork?.let { item ->
                         synchronized(capturedHandshakes) { capturedHandshakes[item.bssid.lowercase()] }
                     }
-                    if (currentNetwork != null) renderCapture(currentNetwork, currentHandshake)
+                    if (currentNetwork != null) renderCapture(currentNetwork, currentHandshake, currentClients)
                     else binding.handshakeDownloadButton.isEnabled = true
                 }
             }

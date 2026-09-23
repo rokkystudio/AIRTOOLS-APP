@@ -37,6 +37,13 @@ class AirtoolsRepository(context: Context)
         return response to AirtoolsProtocol.parseHandshakeIndex(response.text)
     }
 
+    /** Returns client stations seen for access points in the current capture session. */
+    fun clients(): List<WifiClient>
+    {
+        val response = checked("/clients")
+        return AirtoolsProtocol.parseClients(response.text)
+    }
+
     /** Streams the PCAP file indexed for the selected handshake entry into the caller's output. */
     fun downloadHandshake(file: String, output: OutputStream): Long
     {
@@ -44,8 +51,9 @@ class AirtoolsRepository(context: Context)
         return client.download("/handshake/download?file=${query(file)}", output)
     }
 
-    /** Runs five deauth replay packets against the device's current capture BSSID. */
-    fun replay(): AirtoolsResponse = checked("/replay")
+    /** Runs five deauth replay packets against the current capture BSSID and optional client station. */
+    fun replay(station: String? = null): AirtoolsResponse =
+        if (station.isNullOrBlank()) checked("/replay") else checked("/replay?station=${query(station)}")
 
     fun aireplayTest(count: Int = 1): AirtoolsResponse =
         checked("/aireplay?mode=test&count=${count.coerceIn(1, 128)}")
