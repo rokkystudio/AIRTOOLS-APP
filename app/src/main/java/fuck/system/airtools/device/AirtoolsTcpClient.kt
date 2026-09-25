@@ -15,12 +15,13 @@ class AirtoolsTcpClient(
     private val host: String = AirtoolsDevice.DEFAULT_HOST,
     private val port: Int = AirtoolsDevice.DEFAULT_PORT,
     private val timeoutMillis: Int = AirtoolsDevice.DEFAULT_TIMEOUT_MILLIS
-)
+) : AirtoolsConnection
 {
     private val connectivityManager =
         context.applicationContext.getSystemService(ConnectivityManager::class.java)
 
-    fun request(command: String): AirtoolsResponse
+    /** Sends one text command through the active non-VPN Wi-Fi network. */
+    override fun request(command: String): AirtoolsResponse
     {
         val network = wifiNetwork()
         network.socketFactory.createSocket().use { socket ->
@@ -47,7 +48,7 @@ class AirtoolsTcpClient(
     }
 
     /** Reads a text status line and streams the size-framed binary response body. */
-    fun download(command: String, output: OutputStream): Long
+    override fun download(command: String, output: OutputStream): Long
     {
         val network = wifiNetwork()
         network.socketFactory.createSocket().use { socket ->

@@ -1,7 +1,9 @@
 package fuck.system.airtools
 
+import android.Manifest
 import android.app.AlertDialog
 import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
@@ -48,6 +50,7 @@ class MainActivity : ThemedActivity()
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
+        requestConnectionPermissions()
         repository = AirtoolsRepository(applicationContext)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -77,6 +80,25 @@ class MainActivity : ThemedActivity()
     {
         monitorGeneration++
         super.onPause()
+    }
+
+    /** Requests runtime permissions used by BLE discovery while keeping Wi-Fi TCP support available. */
+    private fun requestConnectionPermissions()
+    {
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        }
+        else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        val missing = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) {
+            requestPermissions(missing.toTypedArray(), CONNECTION_PERMISSION_REQUEST)
+        }
     }
 
     private fun monitorDevice(generation: Int)
@@ -593,5 +615,6 @@ class MainActivity : ThemedActivity()
         private const val PREFS = "airtools"
         private const val REFRESH_MILLIS = 1000L
         private const val FAILURE_THRESHOLD = 3
+        private const val CONNECTION_PERMISSION_REQUEST = 2207
     }
 }

@@ -4,10 +4,10 @@ import android.content.Context
 import java.io.OutputStream
 import java.net.URLEncoder
 
-/** Provides typed access to the AIRTOOLS TCP API, including handshake PCAP downloads. */
+/** Provides typed access to the AIRTOOLS API over BLE ESP32 or legacy TCP transport. */
 class AirtoolsRepository(context: Context)
 {
-    private val client = AirtoolsTcpClient(context.applicationContext)
+    private val client: AirtoolsConnection = AirtoolsAutoClient(context.applicationContext)
     private val handshakeFilePattern = Regex("^[0-9A-Fa-f]{12}\\.pcap$")
 
     fun status(): AirtoolsStatus

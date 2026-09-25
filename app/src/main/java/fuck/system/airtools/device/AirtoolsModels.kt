@@ -70,9 +70,48 @@ object AirtoolsProtocol
     fun parseStatus(text: String): AirtoolsStatus
     {
         val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
-        require(lines.size == 2) { "Unexpected /status response" }
+        require(lines.size >= 2) { "Unexpected /status response" }
         val first = lines[0]
         require(first.startsWith("OK airtools=1 ")) { "Malformed /status response" }
+
+        return if (first.contains(" transport=ble ")) {
+            parseEsp32Status(lines[1])
+        } else {
+            parseLegacyStatus(lines)
+        }
+    }
+
+    private fun parseEsp32Status(line: String): AirtoolsStatus
+    {
+        val values = line.split(Regex("\\s+"))
+            .filter { it.contains("=") }
+            .associate { part ->
+                val pieces = part.split("=", limit = 2)
+                pieces[0] to pieces[1]
+            }
+        val mode = when (values["mode"])
+        {
+            "scan" -> DeviceMode.SCAN
+            "capture" -> DeviceMode.CAPTURE
+            "idle" -> DeviceMode.IDLE
+            else -> throw IllegalArgumentException("Invalid device mode")
+        }
+        val channel = values["channel"]?.toIntOrNull()
+        require(channel == null || channel in 1..14) { "Invalid channel" }
+        val bssid = values["bssid"]
+        val target = if (bssid != null) {
+            require(macRegex.matches(bssid)) { "Invalid BSSID" }
+            AirodumpTarget.Bssid(bssid)
+        } else {
+            AirodumpTarget.All
+        }
+        return AirtoolsStatus(mode, target, channel)
+    }
+
+    private fun parseLegacyStatus(lines: List<String>): AirtoolsStatus
+    {
+        require(lines.size == 2) { "Unexpected /status response" }
+        val first = lines[0]
         val pid = first.substringAfter("pid=").substringBefore(' ').toIntOrNull()
             ?: throw IllegalArgumentException("Invalid pid")
         val scanning = first.substringAfter(" scan=").substringBefore(' ').toIntOrNull()
