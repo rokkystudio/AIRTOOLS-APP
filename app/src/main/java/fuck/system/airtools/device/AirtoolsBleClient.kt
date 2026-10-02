@@ -10,13 +10,12 @@ import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
-import android.os.ParcelUuid
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
@@ -25,7 +24,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
-/** Blocking BLE GATT client for AIRTOOLS-ESP32 command notifications. */
+/** Maintains a reusable BLE GATT session for AIRTOOLS commands. */
 class AirtoolsBleClient(
     context: Context,
     private val timeoutMillis: Int = AirtoolsDevice.DEFAULT_BLE_TIMEOUT_MILLIS
@@ -33,38 +32,46 @@ class AirtoolsBleClient(
 {
     private val context = context.applicationContext
     private val bluetoothManager = context.getSystemService(BluetoothManager::class.java)
+    private val cachedDevice = AtomicReference<BluetoothDevice?>()
+    private val sessionLock = Any()
+    private var session: GattSession? = null
 
-    /** Scans for AIRTOOLS-ESP32, sends one command through BLE, and collects notifications until EOF. */
+    /** Sends a command over one persistent BLE connection and waits for the EOF notification marker. */
     @SuppressLint("MissingPermission")
     override fun request(command: String): AirtoolsResponse
     {
         ensurePermissions()
-        val device = findDevice()
-        val text = GattRequest(command).execute(device)
-        return AirtoolsResponse(command, text)
+        synchronized(sessionLock)
+        {
+            val active = session ?: GattSession(findDevice()).also { session = it }
+            return try {
+                AirtoolsResponse(command, active.request(command))
+            }
+            catch (error: Throwable)
+            {
+                active.close()
+                if (session === active) session = null
+                cachedDevice.set(null)
+                throw error
+            }
+        }
     }
 
-    /** Downloads a hex-framed PCAP response from AIRTOOLS-ESP32 and writes decoded bytes. */
+    /** Downloads a hex-framed PCAP response from AIRTOOLS and writes decoded bytes. */
     override fun download(command: String, output: OutputStream): Long
     {
         val response = request(command)
         require(response.ok) { response.text.trim() }
 
-        val lines = response.text.lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .toList()
+        val lines = response.text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
         require(lines.size >= 2) { response.text.trim() }
 
         val header = lines.first()
         require(header.startsWith("OK handshake_hex ")) { header }
 
-        val expectedBytes = HANDSHAKE_BYTES_PATTERN.find(header)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.toIntOrNull()
+        val expectedBytes = HANDSHAKE_BYTES_PATTERN.find(header)?.groupValues?.getOrNull(1)?.toIntOrNull()
             ?: throw IOException("Missing handshake size")
-        val hex = lines.drop(1).joinToString(separator = "")
+        val hex = lines.drop(1).joinToString("")
         require(hex.length == expectedBytes * 2) { "Handshake hex size mismatch" }
 
         val bytes = ByteArray(expectedBytes)
@@ -72,7 +79,6 @@ class AirtoolsBleClient(
             val offset = index * 2
             bytes[index] = ((hexValue(hex[offset]) shl 4) or hexValue(hex[offset + 1])).toByte()
         }
-
         output.write(bytes)
         output.flush()
         return bytes.size.toLong()
@@ -81,9 +87,23 @@ class AirtoolsBleClient(
     @SuppressLint("MissingPermission")
     private fun findDevice(): BluetoothDevice
     {
+        cachedDevice.get()?.let { return it }
+
         val adapter = bluetoothManager?.adapter ?: throw IOException("Bluetooth adapter unavailable")
-        if (!adapter.isEnabled) {
-            throw IOException("Bluetooth is disabled")
+        if (!adapter.isEnabled) throw IOException("Bluetooth is disabled")
+
+        adapter.bondedDevices.firstOrNull {
+            runCatching { it.name == AirtoolsDevice.BLE_DEVICE_NAME }.getOrDefault(false)
+        }?.let {
+            cachedDevice.set(it)
+            return it
+        }
+
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.P..Build.VERSION_CODES.R) {
+            val locationManager = context.getSystemService(LocationManager::class.java)
+            if (locationManager != null && !locationManager.isLocationEnabled) {
+                throw IOException("Location must be enabled for BLE scan on Android 9-11")
+            }
         }
 
         val scanner = adapter.bluetoothLeScanner ?: throw IOException("BLE scanner unavailable")
@@ -113,19 +133,17 @@ class AirtoolsBleClient(
             }
         }
 
-        val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build())
-        val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            .build()
-
-        scanner.startScan(filters, settings, callback)
+        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+        scanner.startScan(emptyList(), settings, callback)
         try {
             latch.await(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
         } finally {
             scanner.stopScan(callback)
         }
 
-        return found.get() ?: throw IOException("AIRTOOLS-ESP32 BLE device unavailable")
+        val device = found.get() ?: throw IOException("AIRTOOLS BLE device unavailable")
+        cachedDevice.set(device)
+        return device
     }
 
     private fun matchesAirtools(result: ScanResult): Boolean
@@ -136,12 +154,10 @@ class AirtoolsBleClient(
 
     private fun ensurePermissions()
     {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-        {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             requirePermission(Manifest.permission.BLUETOOTH_SCAN)
             requirePermission(Manifest.permission.BLUETOOTH_CONNECT)
-        }
-        else {
+        } else {
             requirePermission(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
@@ -153,63 +169,69 @@ class AirtoolsBleClient(
         }
     }
 
-    private inner class GattRequest(private val command: String) : BluetoothGattCallback()
+    private inner class GattSession(private val device: BluetoothDevice) : BluetoothGattCallback()
     {
         private val readyLatch = CountDownLatch(1)
-        private val responseLatch = CountDownLatch(1)
-        private val error = AtomicReference<Throwable?>()
-        private val response = ByteArrayOutputStream()
+        private val connectionError = AtomicReference<Throwable?>()
         private var gatt: BluetoothGatt? = null
         private var rxCharacteristic: BluetoothGattCharacteristic? = null
+        private var txCharacteristic: BluetoothGattCharacteristic? = null
+        private var responseLatch: CountDownLatch? = null
+        private var response = ByteArrayOutputStream()
+
+        init {
+            @SuppressLint("MissingPermission")
+            gatt = device.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE)
+        }
 
         @SuppressLint("MissingPermission")
-        fun execute(device: BluetoothDevice): String
+        fun request(command: String): String
         {
-            gatt = device.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE)
-            try
-            {
-                if (!readyLatch.await(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)) {
-                    throw IOException("BLE connection timeout")
-                }
-                error.get()?.let { throw it }
-
-                if (!responseLatch.await(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)) {
-                    throw IOException("BLE response timeout")
-                }
-                error.get()?.let { throw it }
-
-                val text = response.toString(Charsets.UTF_8.name())
-                    .replace(EOF_MARKER, "")
-                    .trimEnd()
-                require(text.isNotEmpty()) { "Empty BLE response" }
-                return text
+            if (!readyLatch.await(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)) {
+                throw IOException("BLE connection timeout")
             }
-            finally
-            {
-                runCatching { gatt?.disconnect() }
-                runCatching { gatt?.close() }
-                gatt = null
+            connectionError.get()?.let { throw it }
+
+            response = ByteArrayOutputStream()
+            val latch = CountDownLatch(1)
+            responseLatch = latch
+
+            val gatt = gatt ?: throw IOException("BLE session is closed")
+            val rx = rxCharacteristic ?: throw IOException("AIRTOOLS BLE RX characteristic is unavailable")
+            rx.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            rx.value = (command + "\n").toByteArray(Charsets.UTF_8)
+            if (!gatt.writeCharacteristic(rx)) {
+                throw IOException("BLE command write was not accepted")
             }
+
+            if (!latch.await(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)) {
+                throw IOException("BLE response timeout")
+            }
+            connectionError.get()?.let { throw it }
+
+            return response.toString(Charsets.UTF_8.name()).replace(EOF_MARKER, "").trimEnd().also {
+                require(it.isNotEmpty()) { "Empty BLE response" }
+            }
+        }
+
+        @SuppressLint("MissingPermission")
+        fun close()
+        {
+            runCatching { gatt?.disconnect() }
+            runCatching { gatt?.close() }
+            gatt = null
         }
 
         @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int)
         {
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                error.set(IOException("BLE connection failed: $status"))
-                readyLatch.countDown()
-                responseLatch.countDown()
+                fail(IOException("BLE connection failed: $status"))
                 return
             }
-
-            when (newState)
-            {
+            when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> gatt.discoverServices()
-                BluetoothProfile.STATE_DISCONNECTED -> {
-                    error.compareAndSet(null, IOException("BLE disconnected"))
-                    readyLatch.countDown()
-                    responseLatch.countDown()
-                }
+                BluetoothProfile.STATE_DISCONNECTED -> fail(IOException("BLE disconnected"))
             }
         }
 
@@ -217,9 +239,7 @@ class AirtoolsBleClient(
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int)
         {
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                error.set(IOException("BLE service discovery failed: $status"))
-                readyLatch.countDown()
-                responseLatch.countDown()
+                fail(IOException("BLE service discovery failed: $status"))
                 return
             }
 
@@ -227,48 +247,53 @@ class AirtoolsBleClient(
             val tx = service?.getCharacteristic(TX_UUID)
             val rx = service?.getCharacteristic(RX_UUID)
             if (service == null || tx == null || rx == null) {
-                error.set(IOException("AIRTOOLS BLE service is incomplete"))
-                readyLatch.countDown()
-                responseLatch.countDown()
+                fail(IOException("AIRTOOLS BLE service is incomplete"))
                 return
             }
 
             rxCharacteristic = rx
-            gatt.requestMtu(AirtoolsDevice.BLE_MTU)
-            gatt.setCharacteristicNotification(tx, true)
+            txCharacteristic = tx
+            if (!gatt.requestMtu(AirtoolsDevice.BLE_MTU)) enableNotifications(gatt)
+        }
+
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int)
+        {
+            enableNotifications(gatt)
+        }
+
+        @SuppressLint("MissingPermission")
+        private fun enableNotifications(gatt: BluetoothGatt)
+        {
+            val tx = txCharacteristic ?: run {
+                fail(IOException("AIRTOOLS BLE TX characteristic is unavailable"))
+                return
+            }
+            if (!gatt.setCharacteristicNotification(tx, true)) {
+                fail(IOException("BLE notification subscription was rejected"))
+                return
+            }
 
             val descriptor = tx.getDescriptor(CLIENT_CONFIG_UUID)
             if (descriptor == null) {
                 readyLatch.countDown()
-                writeCommand(gatt)
-            } else {
-                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                if (!gatt.writeDescriptor(descriptor)) {
-                    readyLatch.countDown()
-                    writeCommand(gatt)
-                }
+                return
+            }
+
+            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            if (!gatt.writeDescriptor(descriptor)) {
+                fail(IOException("BLE notification descriptor write was not accepted"))
             }
         }
 
-        @SuppressLint("MissingPermission")
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int)
         {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                readyLatch.countDown()
-                writeCommand(gatt)
-            } else {
-                error.set(IOException("BLE notify setup failed: $status"))
-                readyLatch.countDown()
-                responseLatch.countDown()
-            }
+            if (status == BluetoothGatt.GATT_SUCCESS) readyLatch.countDown()
+            else fail(IOException("BLE notify setup failed: $status"))
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int)
         {
-            if (status != BluetoothGatt.GATT_SUCCESS) {
-                error.set(IOException("BLE command write failed: $status"))
-                responseLatch.countDown()
-            }
+            if (status != BluetoothGatt.GATT_SUCCESS) fail(IOException("BLE command write failed: $status"))
         }
 
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic)
@@ -276,35 +301,27 @@ class AirtoolsBleClient(
             appendNotification(characteristic.value)
         }
 
-        override fun onCharacteristicChanged(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            value: ByteArray
-        )
+        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray)
         {
             appendNotification(value)
         }
 
-        @SuppressLint("MissingPermission")
-        private fun writeCommand(gatt: BluetoothGatt)
+        private fun appendNotification(value: ByteArray)
         {
-            val rx = rxCharacteristic ?: return
-            rx.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            rx.value = (command + "\n").toByteArray(Charsets.UTF_8)
-            if (!gatt.writeCharacteristic(rx)) {
-                error.set(IOException("BLE command write was not accepted"))
-                responseLatch.countDown()
+            synchronized(response)
+            {
+                response.write(value)
+                if (response.toString(Charsets.UTF_8.name()).contains(EOF_MARKER)) {
+                    responseLatch?.countDown()
+                }
             }
         }
 
-        private fun appendNotification(value: ByteArray)
+        private fun fail(error: Throwable)
         {
-            synchronized(response) {
-                response.write(value)
-                if (response.toString(Charsets.UTF_8.name()).contains(EOF_MARKER)) {
-                    responseLatch.countDown()
-                }
-            }
+            connectionError.compareAndSet(null, error)
+            readyLatch.countDown()
+            responseLatch?.countDown()
         }
     }
 

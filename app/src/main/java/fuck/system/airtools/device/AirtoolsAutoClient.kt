@@ -3,7 +3,7 @@ package fuck.system.airtools.device
 import android.content.Context
 import java.io.OutputStream
 
-/** Chooses BLE AIRTOOLS-ESP32 when available and falls back to the legacy TCP device. */
+/** Chooses BLE AIRTOOLS when available and falls back to the legacy TCP device. */
 class AirtoolsAutoClient(context: Context) : AirtoolsConnection
 {
     private val bleClient = AirtoolsBleClient(context.applicationContext)

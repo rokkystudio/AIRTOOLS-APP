@@ -138,8 +138,11 @@ class MainActivity : ThemedActivity()
                     consecutiveFailures++
                     if (!connectedOnce || consecutiveFailures >= FAILURE_THRESHOLD)
                     {
+                        val connectionError = error.message?.takeIf { it.isNotBlank() }
                         runOnUiThread {
                             if (generation == monitorGeneration) {
+                                binding.unavailableTextView.text =
+                                    connectionError ?: getString(R.string.device_unavailable_hint)
                                 renderConnection(ConnectionState.UNAVAILABLE)
                                 renderScreen(Screen.UNAVAILABLE)
                             }
