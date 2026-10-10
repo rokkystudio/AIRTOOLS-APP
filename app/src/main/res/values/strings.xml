@@ -1,13 +1,13 @@
 <resources>
     <string name="app_name">AIRTOOLS</string>
-    <string name="app_icon">AIRTOOLS icon</string>
-    <string name="change_theme">Change theme</string>
-    <string name="change_language">Change language</string>
-    <string name="back_to_networks">Back to Wi-Fi networks</string>
+    <string name="android_client">Android client</string>
     <string name="status_connected">Device connected</string>
     <string name="status_connecting">Connecting to device</string>
     <string name="status_server_unavailable">Device unavailable</string>
     <string name="waiting_for_device">Waiting for device…</string>
+    <string name="device_details_unknown">Device: unknown</string>
+    <string name="device_details_format">Device: %1$s · firmware %2$s</string>
+    <string name="device_version_unknown">unknown</string>
     <string name="device_unavailable_hint">Waiting for the AIRTOOLS device. The app will reconnect automatically.</string>
     <string name="wifi_networks">Wi-Fi networks</string>
     <string name="scanning_channels">Scanning Wi-Fi networks</string>
@@ -25,10 +25,14 @@
     <string name="signal_value_unknown">Signal —</string>
     <string name="signal_value_offline">Signal: Offline</string>
     <string name="capture_active">Capture active</string>
-    <string name="capture_counters">Beacons: %1$d\nProbe responses: %2$d\nData frames: %3$d</string>
+    <string name="capture_counters">Beacons: %1$d
+Probe responses: %2$d
+Data frames: %3$d</string>
     <string name="handshake_title">WPA handshake</string>
     <string name="handshake_waiting">Waiting for a handshake…</string>
-    <string name="handshake_captured">Captured #%2$d • %1$d frames\nCaptured at: %3$s\n%4$s</string>
+    <string name="handshake_captured">Captured #%2$d • %1$d frames
+Captured at: %3$s
+%4$s</string>
     <string name="handshake_time_unknown">unknown time</string>
     <string name="download_handshake">Download handshake</string>
     <string name="handshake_downloading">Downloading handshake…</string>
@@ -41,10 +45,12 @@
     <string name="signal_dbm_only">%1$d dBm</string>
     <string name="replay_client_content_description">Aireplay deauth for %1$s</string>
     <string name="replay_dialog_title">Aireplay Deauth</string>
-    <string name="replay_dialog_message">Run Aireplay Deauth against %1$s?</string>
+    <string name="replay_count_label">Replay packets</string>
+    <string name="replay_count_invalid">Use %1$d..%2$d packets</string>
+    <string name="replay_dialog_message">Send %1$d Aireplay Deauth packets to %2$s?</string>
     <string name="replay_dialog_confirm">Run</string>
     <string name="replay_dialog_cancel">Cancel</string>
     <string name="replay_running">Sending replay…</string>
-    <string name="replay_started">Replay sent to %1$s</string>
+    <string name="replay_started">Sent %1$d replay packets to %2$s</string>
     <string name="replay_failed">Replay failed: %1$s</string>
 </resources>

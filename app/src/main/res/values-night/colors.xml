@@ -21,4 +21,8 @@
     <color name="signal_poor">#FFEF4B4B</color>
     <color name="signal_outline">#FF5F6368</color>
     <color name="signal_inactive_fill">#00000000</color>
+    <color name="button_surface">#FF2A303A</color>
+    <color name="button_disabled">#FF20252D</color>
+    <color name="button_text_disabled">#FF4B525B</color>
+    <color name="border_disabled">#FF303841</color>
 </resources>

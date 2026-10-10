@@ -51,9 +51,20 @@ class AirtoolsRepository(context: Context)
         return client.download("/handshake/download?file=${query(file)}", output)
     }
 
-    /** Runs five deauth replay packets against the current capture BSSID and optional client station. */
-    fun replay(station: String? = null): AirtoolsResponse =
-        if (station.isNullOrBlank()) checked("/replay") else checked("/replay?station=${query(station)}")
+    /** Runs deauth replay packets against the current capture BSSID and optional client station. */
+    fun replay(station: String? = null, count: Int): AirtoolsResponse
+    {
+        val boundedCount = count.coerceIn(1, 128)
+        val stationQuery = if (station.isNullOrBlank())
+        {
+            ""
+        }
+        else
+        {
+            "&station=${query(station)}"
+        }
+        return checked("/replay?count=$boundedCount$stationQuery")
+    }
 
     fun aireplayTest(count: Int = 1): AirtoolsResponse =
         checked("/aireplay?mode=test&count=${count.coerceIn(1, 128)}")

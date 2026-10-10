@@ -1,13 +1,13 @@
 <resources>
     <string name="app_name">AIRTOOLS</string>
-    <string name="app_icon">Иконка AIRTOOLS</string>
-    <string name="change_theme">Сменить тему</string>
-    <string name="change_language">Сменить язык</string>
-    <string name="back_to_networks">Вернуться к выбору Wi-Fi сети</string>
+    <string name="android_client">Android-клиент</string>
     <string name="status_connected">Устройство подключено</string>
     <string name="status_connecting">Подключение к устройству</string>
     <string name="status_server_unavailable">Устройство недоступно</string>
     <string name="waiting_for_device">Ожидание устройства…</string>
+    <string name="device_details_unknown">Устройство: неизвестно</string>
+    <string name="device_details_format">Устройство: %1$s · прошивка %2$s</string>
+    <string name="device_version_unknown">неизвестно</string>
     <string name="device_unavailable_hint">Ожидание устройства AIRTOOLS. Приложение подключится автоматически.</string>
     <string name="wifi_networks">Wi-Fi сети</string>
     <string name="scanning_channels">Сканирование Wi-Fi сетей</string>
@@ -27,10 +27,14 @@
     <string name="signal_value_unknown">Сигнал —</string>
     <string name="signal_value_offline">Сигнал: Offline</string>
     <string name="capture_active">Захват активен</string>
-    <string name="capture_counters">Beacon: %1$d\nProbe response: %2$d\nData-кадры: %3$d</string>
+    <string name="capture_counters">Beacon: %1$d
+Probe response: %2$d
+Data-кадры: %3$d</string>
     <string name="handshake_title">WPA handshake</string>
     <string name="handshake_waiting">Ожидание handshake…</string>
-    <string name="handshake_captured">Получен #%2$d • кадров: %1$d\nВремя: %3$s\n%4$s</string>
+    <string name="handshake_captured">Получен #%2$d • кадров: %1$d
+Время: %3$s
+%4$s</string>
     <string name="handshake_time_unknown">время неизвестно</string>
     <string name="download_handshake">Скачать handshake</string>
     <string name="handshake_downloading">Скачивание handshake…</string>
@@ -43,10 +47,12 @@
     <string name="signal_dbm_only">%1$d dBm</string>
     <string name="replay_client_content_description">Aireplay deauth для %1$s</string>
     <string name="replay_dialog_title">Aireplay Deauth</string>
-    <string name="replay_dialog_message">Выполнить Aireplay Deauth для %1$s?</string>
+    <string name="replay_count_label">Replay-пакетов</string>
+    <string name="replay_count_invalid">Укажите %1$d..%2$d пакетов</string>
+    <string name="replay_dialog_message">Отправить %1$d Aireplay Deauth пакетов для %2$s?</string>
     <string name="replay_dialog_confirm">Выполнить</string>
     <string name="replay_dialog_cancel">Отмена</string>
     <string name="replay_running">Отправка replay…</string>
-    <string name="replay_started">Replay отправлен на %1$s</string>
+    <string name="replay_started">Отправлено replay-пакетов: %1$d для %2$s</string>
     <string name="replay_failed">Replay не выполнен: %1$s</string>
 </resources>

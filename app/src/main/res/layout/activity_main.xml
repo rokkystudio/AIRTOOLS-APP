@@ -5,9 +5,10 @@
     android:background="@color/background"
     android:orientation="vertical">
 
-    <include
-        android:id="@+id/topBar"
-        layout="@layout/top_bar" />
+    <com.rokkystudio.sharedapp.neoui.NeoTopBarView
+        android:id="@+id/neoTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="80dp" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -26,17 +27,33 @@
             android:layout_height="10dp"
             android:background="@drawable/status_indicator" />
 
-        <TextView
-            android:id="@+id/connectionStatusTextView"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="9dp"
             android:layout_weight="1"
-            android:includeFontPadding="false"
-            android:text="@string/status_connecting"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/connectionStatusTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="@string/status_connecting"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/connectionDeviceTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:includeFontPadding="false"
+                android:text="@string/device_details_unknown"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <FrameLayout
@@ -228,6 +245,36 @@
                         android:textColor="@color/text_primary"
                         android:textSize="16sp"
                         android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:includeFontPadding="false"
+                            android:text="@string/replay_count_label"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp" />
+
+                        <EditText
+                            android:id="@+id/replayCountEditText"
+                            android:layout_width="96dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_card"
+                            android:gravity="center"
+                            android:inputType="number"
+                            android:maxLength="3"
+                            android:padding="8dp"
+                            android:selectAllOnFocus="true"
+                            android:textColor="@color/text_primary"
+                            android:textSize="15sp" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/clientsEmptyTextView"

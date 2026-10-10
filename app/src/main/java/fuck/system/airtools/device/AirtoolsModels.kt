@@ -13,7 +13,9 @@ enum class DeviceMode { IDLE, SCAN, CAPTURE }
 data class AirtoolsStatus(
     val mode: DeviceMode,
     val target: AirodumpTarget,
-    val channel: Int?
+    val channel: Int?,
+    val deviceName: String,
+    val deviceVersion: String?
 )
 
 data class WifiNetwork(
@@ -67,6 +69,16 @@ object AirtoolsProtocol
 {
     private val macRegex = Regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
 
+    private fun keyValues(line: String): Map<String, String>
+    {
+        return line.split(Regex("\\s+"))
+            .filter { it.contains("=") }
+            .associate { part ->
+                val pieces = part.split("=", limit = 2)
+                pieces[0] to pieces[1]
+            }
+    }
+
     fun parseStatus(text: String): AirtoolsStatus
     {
         val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
@@ -75,20 +87,16 @@ object AirtoolsProtocol
         require(first.startsWith("OK airtools=1 ")) { "Malformed /status response" }
 
         return if (first.contains(" transport=ble ")) {
-            parseEsp32Status(lines[1])
+            parseEsp32Status(first, lines[1])
         } else {
             parseLegacyStatus(lines)
         }
     }
 
-    private fun parseEsp32Status(line: String): AirtoolsStatus
+    private fun parseEsp32Status(firstLine: String, line: String): AirtoolsStatus
     {
-        val values = line.split(Regex("\\s+"))
-            .filter { it.contains("=") }
-            .associate { part ->
-                val pieces = part.split("=", limit = 2)
-                pieces[0] to pieces[1]
-            }
+        val headerValues = keyValues(firstLine)
+        val values = keyValues(line)
         val mode = when (values["mode"])
         {
             "scan" -> DeviceMode.SCAN
@@ -105,13 +113,16 @@ object AirtoolsProtocol
         } else {
             AirodumpTarget.All
         }
-        return AirtoolsStatus(mode, target, channel)
+        val deviceName = headerValues["device"] ?: headerValues["name"] ?: "AIRTOOLS BLE"
+        val deviceVersion = headerValues["version"]
+        return AirtoolsStatus(mode, target, channel, deviceName, deviceVersion)
     }
 
     private fun parseLegacyStatus(lines: List<String>): AirtoolsStatus
     {
         require(lines.size == 2) { "Unexpected /status response" }
         val first = lines[0]
+        val headerValues = keyValues(first)
         val pid = first.substringAfter("pid=").substringBefore(' ').toIntOrNull()
             ?: throw IllegalArgumentException("Invalid pid")
         val scanning = first.substringAfter(" scan=").substringBefore(' ').toIntOrNull()
@@ -145,7 +156,9 @@ object AirtoolsProtocol
             else -> throw IllegalArgumentException("Invalid device mode")
         }
         require(lines[1].startsWith("state_path=") && lines[1].length > 11) { "Missing state path" }
-        return AirtoolsStatus(mode, target, channel)
+        val deviceName = headerValues["device"] ?: headerValues["name"] ?: "AIRTOOLS Wi-Fi"
+        val deviceVersion = headerValues["version"]
+        return AirtoolsStatus(mode, target, channel, deviceName, deviceVersion)
     }
 
     fun parseNetworks(text: String): List<WifiNetwork>

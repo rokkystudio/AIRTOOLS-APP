@@ -8,6 +8,8 @@ import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.text.Editable
+import android.text.TextWatcher
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
@@ -15,6 +17,13 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+import com.rokkystudio.sharedapp.neoui.NeoLanguageDefaults
+import com.rokkystudio.sharedapp.neoui.NeoThemeDefaults
+import com.rokkystudio.sharedapp.neoui.NeoTopBarView
 import java.io.File
 import java.io.OutputStream
 import java.text.DateFormat
@@ -30,10 +39,12 @@ import fuck.system.airtools.device.WifiNetwork
 import kotlin.concurrent.thread
 
 /** Presents the device connection, network scan, capture details, and saved handshake actions. */
-class MainActivity : ThemedActivity()
+class MainActivity : AppCompatActivity()
 {
     private lateinit var binding: ActivityMainBinding
     private lateinit var repository: AirtoolsRepository
+    private lateinit var uiSettings: UiSettings
+    private lateinit var neoTopBar: NeoTopBarView
     private lateinit var networkAdapter: WifiNetworkAdapter
     private val signalTracker = WifiSignalTracker()
 
@@ -43,6 +54,7 @@ class MainActivity : ThemedActivity()
     private var connectedOnce = false
     private var currentScreen = Screen.CONNECTING
     private var selectedNetwork: WifiNetwork? = null
+    private var replayCount: Int = DEFAULT_REPLAY_COUNT
     private var currentClients: List<WifiClient> = emptyList()
     private val captureDateFormat: DateFormat by lazy { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM) }
     private val capturedHandshakes = mutableMapOf<String, HandshakeIndexEntry>()
@@ -52,17 +64,53 @@ class MainActivity : ThemedActivity()
         super.onCreate(savedInstanceState)
         requestConnectionPermissions()
         repository = AirtoolsRepository(applicationContext)
+        uiSettings = UiSettings(applicationContext)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setupTopBar(binding.topBar, getString(R.string.app_name))
+        neoTopBar = binding.neoTopBar
+        renderTopBar()
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true)
+        {
+            override fun handleOnBackPressed()
+            {
+                if (currentScreen == Screen.CAPTURE)
+                {
+                    returnToNetworkSelection()
+                }
+                else
+                {
+                    finish()
+                }
+            }
+        })
 
         networkAdapter = WifiNetworkAdapter(this)
         binding.networksListView.adapter = networkAdapter
         binding.networksListView.setOnItemClickListener { _, _, position, _ ->
             selectNetwork(networkAdapter.getItem(position))
         }
-        binding.topBar.backButton.setOnClickListener { returnToNetworkSelection() }
         binding.handshakeDownloadButton.setOnClickListener { downloadHandshake() }
+        replayCount = loadReplayCount()
+        binding.replayCountEditText.setText(replayCount.toString())
+        binding.replayCountEditText.addTextChangedListener(object : TextWatcher
+        {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: Editable?)
+            {
+                val parsed = parseReplayCount(s?.toString().orEmpty())
+                binding.replayCountEditText.error = if (parsed == null)
+                {
+                    getString(R.string.replay_count_invalid, MIN_REPLAY_COUNT, MAX_REPLAY_COUNT)
+                }
+                else
+                {
+                    replayCount = parsed
+                    saveReplayCount(parsed)
+                    null
+                }
+            }
+        })
 
         selectedNetwork = loadSelectedNetwork()
         renderConnection(ConnectionState.CONNECTING)
@@ -80,6 +128,72 @@ class MainActivity : ThemedActivity()
     {
         monitorGeneration++
         super.onPause()
+    }
+
+
+    private fun renderTopBar()
+    {
+        neoTopBar.setAppInfo(
+            title = getString(R.string.app_name),
+            subtitle = getString(R.string.android_client),
+            version = BuildConfig.VERSION_NAME,
+            iconResId = R.mipmap.ic_launcher
+        )
+        neoTopBar.setThemeOptions(
+            options = NeoThemeDefaults.dayNight(),
+            selected = selectedNeoTheme(),
+            onSelected = ::applyNeoTheme
+        )
+        neoTopBar.setLanguageOptions(
+            options = NeoLanguageDefaults.supportedLanguages(),
+            selected = uiSettings.getLanguage(),
+            onSelected = ::applyNeoLanguage
+        )
+        neoTopBar.setThemeButtonVisible(true)
+        neoTopBar.setLanguageButtonVisible(true)
+    }
+
+    private fun selectedNeoTheme(): String
+    {
+        return when (uiSettings.getTheme())
+        {
+            AppTheme.LIGHT -> NeoThemeDefaults.DAY
+            AppTheme.DARK -> NeoThemeDefaults.NIGHT
+        }
+    }
+
+    private fun applyNeoTheme(theme: String)
+    {
+        val appTheme = when (theme)
+        {
+            NeoThemeDefaults.DAY -> AppTheme.LIGHT
+            NeoThemeDefaults.NIGHT -> AppTheme.DARK
+            else -> return
+        }
+        if (uiSettings.getTheme() == appTheme)
+        {
+            return
+        }
+        uiSettings.setTheme(appTheme)
+        AppCompatDelegate.setDefaultNightMode(
+            when (appTheme)
+            {
+                AppTheme.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+                AppTheme.DARK -> AppCompatDelegate.MODE_NIGHT_YES
+            }
+        )
+    }
+
+    private fun applyNeoLanguage(language: String)
+    {
+        if (uiSettings.getLanguage() == language)
+        {
+            return
+        }
+        uiSettings.setLanguage(language)
+        AppCompatDelegate.setApplicationLocales(
+            LocaleListCompat.forLanguageTags(language)
+        )
     }
 
     /** Requests runtime permissions used by BLE discovery while keeping Wi-Fi TCP support available. */
@@ -114,7 +228,7 @@ class MainActivity : ThemedActivity()
                     connectedOnce = true
                     runOnUiThread {
                         if (generation == monitorGeneration) {
-                            renderConnection(ConnectionState.CONNECTED)
+                            renderConnection(ConnectionState.CONNECTED, status)
                             when (status.mode) {
                                 DeviceMode.SCAN -> renderScreen(Screen.SCAN)
                                 DeviceMode.CAPTURE -> renderScreen(Screen.CAPTURE)
@@ -255,7 +369,7 @@ class MainActivity : ThemedActivity()
                 saveSelectedNetwork(network)
                 val status = repository.status()
                 runOnUiThread {
-                    renderConnection(ConnectionState.CONNECTED)
+                    renderConnection(ConnectionState.CONNECTED, status)
                     renderScreen(Screen.CAPTURE)
                     currentClients = emptyList()
                     renderCapture(network, null, currentClients)
@@ -282,7 +396,6 @@ class MainActivity : ThemedActivity()
     {
         if (commandInProgress) return
         commandInProgress = true
-        binding.topBar.backButton.isEnabled = false
         thread(name = "airtools-return-to-scan") {
             try
             {
@@ -309,12 +422,11 @@ class MainActivity : ThemedActivity()
             finally
             {
                 commandInProgress = false
-                runOnUiThread { binding.topBar.backButton.isEnabled = true }
             }
         }
     }
 
-    private fun renderConnection(state: ConnectionState)
+    private fun renderConnection(state: ConnectionState, status: AirtoolsStatus? = null)
     {
         val (textRes, colorRes) = when (state)
         {
@@ -324,6 +436,18 @@ class MainActivity : ThemedActivity()
         }
         binding.connectionStatusTextView.setText(textRes)
         binding.connectionStatusIndicator.backgroundTintList = ColorStateList.valueOf(getColor(colorRes))
+        binding.connectionDeviceTextView.text = if (state == ConnectionState.CONNECTED && status != null)
+        {
+            getString(
+                R.string.device_details_format,
+                status.deviceName,
+                status.deviceVersion ?: getString(R.string.device_version_unknown)
+            )
+        }
+        else
+        {
+            getString(R.string.device_details_unknown)
+        }
     }
 
     private fun renderScreen(screen: Screen)
@@ -332,7 +456,6 @@ class MainActivity : ThemedActivity()
         binding.scanContainer.visibility = if (screen == Screen.SCAN || screen == Screen.CONNECTING) View.VISIBLE else View.GONE
         binding.captureScrollView.visibility = if (screen == Screen.CAPTURE) View.VISIBLE else View.GONE
         binding.unavailableTextView.visibility = if (screen == Screen.UNAVAILABLE) View.VISIBLE else View.GONE
-        binding.topBar.backButton.visibility = if (screen == Screen.CAPTURE) View.VISIBLE else View.GONE
         binding.scanProgressBar.visibility = if (screen == Screen.SCAN || screen == Screen.CONNECTING) View.VISIBLE else View.GONE
         if (screen == Screen.CONNECTING) {
             binding.networkCountTextView.text = getString(R.string.waiting_for_device)
@@ -383,6 +506,7 @@ class MainActivity : ThemedActivity()
     {
         binding.clientsContainer.removeAllViews()
         binding.clientsEmptyTextView.visibility = if (clients.isEmpty()) View.VISIBLE else View.GONE
+        binding.replayCountEditText.isEnabled = !commandInProgress
         clients.forEach { client -> binding.clientsContainer.addView(createClientRow(client)) }
     }
 
@@ -437,31 +561,49 @@ class MainActivity : ThemedActivity()
         return row
     }
 
-    /** Asks before starting aireplay -0 5 for a concrete client station. */
+    /** Asks before starting deauth replay for a concrete client station. */
     private fun confirmReplay(client: WifiClient)
     {
         if (commandInProgress) return
+        val count = parseReplayCount(binding.replayCountEditText.text?.toString().orEmpty())
+        if (count == null)
+        {
+            binding.replayCountEditText.error = getString(R.string.replay_count_invalid, MIN_REPLAY_COUNT, MAX_REPLAY_COUNT)
+            return
+        }
+
+        replayCount = count
+        saveReplayCount(count)
         AlertDialog.Builder(this)
             .setTitle(R.string.replay_dialog_title)
-            .setMessage(getString(R.string.replay_dialog_message, client.station))
+            .setMessage(getString(R.string.replay_dialog_message, count, client.station))
             .setPositiveButton(R.string.replay_dialog_confirm) { _, _ -> startReplay(client) }
             .setNegativeButton(R.string.replay_dialog_cancel, null)
             .show()
     }
 
-    /** Starts aireplay -0 5 for a concrete client station on the active capture target. */
+    /** Starts deauth replay for a concrete client station on the active capture target. */
     private fun startReplay(client: WifiClient)
     {
         if (commandInProgress) return
+        val count = parseReplayCount(binding.replayCountEditText.text?.toString().orEmpty())
+        if (count == null)
+        {
+            binding.replayCountEditText.error = getString(R.string.replay_count_invalid, MIN_REPLAY_COUNT, MAX_REPLAY_COUNT)
+            return
+        }
+
+        replayCount = count
+        saveReplayCount(count)
         commandInProgress = true
         renderClients(currentClients)
         Toast.makeText(this, getString(R.string.replay_running), Toast.LENGTH_SHORT).show()
         thread(name = "airtools-replay") {
             try
             {
-                repository.replay(client.station)
+                repository.replay(station = client.station, count = count)
                 runOnUiThread {
-                    Toast.makeText(this, getString(R.string.replay_started, client.station), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.replay_started, count, client.station), Toast.LENGTH_SHORT).show()
                 }
             }
             catch (error: Throwable)
@@ -592,6 +734,26 @@ class MainActivity : ThemedActivity()
             .apply()
     }
 
+    private fun loadReplayCount(): Int
+    {
+        return getSharedPreferences(PREFS, MODE_PRIVATE)
+            .getInt(PREF_REPLAY_COUNT, DEFAULT_REPLAY_COUNT)
+            .coerceIn(MIN_REPLAY_COUNT, MAX_REPLAY_COUNT)
+    }
+
+    private fun saveReplayCount(count: Int)
+    {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putInt(PREF_REPLAY_COUNT, count.coerceIn(MIN_REPLAY_COUNT, MAX_REPLAY_COUNT))
+            .apply()
+    }
+
+    private fun parseReplayCount(value: String): Int?
+    {
+        val count = value.trim().toIntOrNull() ?: return null
+        return count.takeIf { it in MIN_REPLAY_COUNT..MAX_REPLAY_COUNT }
+    }
+
     private fun loadSelectedNetwork(): WifiNetwork?
     {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
@@ -615,6 +777,10 @@ class MainActivity : ThemedActivity()
     companion object
     {
         private const val PREFS = "airtools"
+        private const val PREF_REPLAY_COUNT = "replay_count"
+        private const val DEFAULT_REPLAY_COUNT = 5
+        private const val MIN_REPLAY_COUNT = 1
+        private const val MAX_REPLAY_COUNT = 128
         private const val REFRESH_MILLIS = 1000L
         private const val FAILURE_THRESHOLD = 3
         private const val CONNECTION_PERMISSION_REQUEST = 2207

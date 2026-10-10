@@ -1,11 +1,15 @@
 [versions]
-neoui = "1.0.10"
+sharedApp = "1.0.10"
 agp = "9.3.2"
 activity = "1.13.0"
 coreKtx = "1.19.0"
+appcompat = "1.8.0"
+annotation = "1.9.1"
 
 [libraries]
-neoui = { module = "com.rokkystudio.sharedapp:neoui", version.ref = "neoui" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
+geo = { module = "com.rokkystudio.sharedapp:geo", version.ref = "sharedApp" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activity" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 

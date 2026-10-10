@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
 }
 
@@ -12,8 +12,8 @@ android {
         applicationId = "fuck.system.airtools"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 10
+        versionName = "1.9"
     }
 
     buildTypes {
@@ -30,13 +30,14 @@ android {
     }
 
     buildFeatures {
-        viewBinding = true
         buildConfig = true
+        viewBinding = true
     }
 }
 
 dependencies {
-    implementation(libs.neoui)
+    implementation(project(":neoui"))
+    implementation(libs.appcompat)
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.core.ktx)
 }
