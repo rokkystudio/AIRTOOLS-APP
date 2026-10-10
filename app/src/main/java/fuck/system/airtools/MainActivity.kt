@@ -333,7 +333,6 @@ class MainActivity : ThemedActivity()
         binding.captureScrollView.visibility = if (screen == Screen.CAPTURE) View.VISIBLE else View.GONE
         binding.unavailableTextView.visibility = if (screen == Screen.UNAVAILABLE) View.VISIBLE else View.GONE
         binding.topBar.backButton.visibility = if (screen == Screen.CAPTURE) View.VISIBLE else View.GONE
-        binding.topBar.appIconImageView.visibility = if (screen == Screen.CAPTURE) View.GONE else View.VISIBLE
         binding.scanProgressBar.visibility = if (screen == Screen.SCAN || screen == Screen.CONNECTING) View.VISIBLE else View.GONE
         if (screen == Screen.CONNECTING) {
             binding.networkCountTextView.text = getString(R.string.waiting_for_device)

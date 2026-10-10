@@ -1,9 +1,11 @@
 [versions]
+neoui = "1.0.10"
 agp = "9.3.2"
 activity = "1.13.0"
 coreKtx = "1.19.0"
 
 [libraries]
+neoui = { module = "com.rokkystudio.sharedapp:neoui", version.ref = "neoui" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activity" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 

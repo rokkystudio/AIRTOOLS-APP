@@ -22,5 +22,8 @@ dependencyResolutionManagement {
     }
 }
 
+includeBuild("../SHARED-APP/geo")
+includeBuild("../SHARED-APP/neoui")
+
 rootProject.name = "AIRTOOLS"
 include(":app")
