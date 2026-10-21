@@ -23,11 +23,17 @@ class UiSettings(context: Context)
         preferences.edit().putString(KEY_THEME, theme.preferenceValue).commit()
     }
 
+    /**
+     * Returns the persisted interface language. On first launch the supported system language
+     * is selected once and immediately stored, so later system-language changes do not override it.
+     */
     fun getLanguage(): String
     {
-        return NeoLanguageDefaults.selectedOrSystem(
-            preferences.getString(KEY_LANGUAGE, null)
-        )
+        preferences.getString(KEY_LANGUAGE, null)?.takeIf { it.isNotBlank() }?.let { return it }
+
+        val initialLanguage = NeoLanguageDefaults.currentSupportedSystemLanguage()
+        preferences.edit().putString(KEY_LANGUAGE, initialLanguage).commit()
+        return initialLanguage
     }
 
     fun setLanguage(language: String)
