@@ -1,7 +1,7 @@
 package fuck.system.airtools
 
 import android.content.Context
-import com.rokkystudio.sharedapp.neoui.NeoLanguageDefaults
+import badfox.logic.neoui.NeoLanguageDefaults
 
 /** Stores the selected AIRTOOLS interface theme and language. */
 class UiSettings(context: Context)

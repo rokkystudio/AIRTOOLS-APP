@@ -21,9 +21,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
-import com.rokkystudio.sharedapp.neoui.NeoLanguageDefaults
-import com.rokkystudio.sharedapp.neoui.NeoThemeDefaults
-import com.rokkystudio.sharedapp.neoui.NeoTopBarView
+import badfox.logic.neoui.NeoLanguageDefaults
+import badfox.logic.neoui.NeoThemeDefaults
+import badfox.logic.neoui.NeoTopBarView
 import java.io.File
 import java.io.OutputStream
 import java.text.DateFormat

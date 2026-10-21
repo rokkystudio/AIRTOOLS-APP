@@ -9,7 +9,7 @@ annotation = "1.9.1"
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
-geo = { module = "com.rokkystudio.sharedapp:geo", version.ref = "sharedApp" }
+flags = { module = "badfox.logic.sharedapp:flags", version.ref = "sharedApp" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activity" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 
