@@ -778,7 +778,7 @@ class MainActivity : AppCompatActivity()
     {
         private const val PREFS = "airtools"
         private const val PREF_REPLAY_COUNT = "replay_count"
-        private const val DEFAULT_REPLAY_COUNT = 5
+        private const val DEFAULT_REPLAY_COUNT = 10
         private const val MIN_REPLAY_COUNT = 1
         private const val MAX_REPLAY_COUNT = 128
         private const val REFRESH_MILLIS = 1000L
