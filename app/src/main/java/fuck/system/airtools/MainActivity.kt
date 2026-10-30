@@ -8,11 +8,12 @@ import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.text.Editable
-import android.text.TextWatcher
+import android.text.InputFilter
+import android.text.InputType
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -91,26 +92,6 @@ class MainActivity : AppCompatActivity()
         }
         binding.handshakeDownloadButton.setOnClickListener { downloadHandshake() }
         replayCount = loadReplayCount()
-        binding.replayCountEditText.setText(replayCount.toString())
-        binding.replayCountEditText.addTextChangedListener(object : TextWatcher
-        {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-            override fun afterTextChanged(s: Editable?)
-            {
-                val parsed = parseReplayCount(s?.toString().orEmpty())
-                binding.replayCountEditText.error = if (parsed == null)
-                {
-                    getString(R.string.replay_count_invalid, MIN_REPLAY_COUNT, MAX_REPLAY_COUNT)
-                }
-                else
-                {
-                    replayCount = parsed
-                    saveReplayCount(parsed)
-                    null
-                }
-            }
-        })
 
         selectedNetwork = loadSelectedNetwork()
         renderConnection(ConnectionState.CONNECTING)
@@ -506,7 +487,6 @@ class MainActivity : AppCompatActivity()
     {
         binding.clientsContainer.removeAllViews()
         binding.clientsEmptyTextView.visibility = if (clients.isEmpty()) View.VISIBLE else View.GONE
-        binding.replayCountEditText.isEnabled = !commandInProgress
         clients.forEach { client -> binding.clientsContainer.addView(createClientRow(client)) }
     }
 
@@ -565,36 +545,61 @@ class MainActivity : AppCompatActivity()
     private fun confirmReplay(client: WifiClient)
     {
         if (commandInProgress) return
-        val count = parseReplayCount(binding.replayCountEditText.text?.toString().orEmpty())
-        if (count == null)
-        {
-            binding.replayCountEditText.error = getString(R.string.replay_count_invalid, MIN_REPLAY_COUNT, MAX_REPLAY_COUNT)
-            return
+
+        val density = resources.displayMetrics.density
+        fun dp(value: Int): Int = (value * density).toInt()
+
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            filters = arrayOf<InputFilter>(InputFilter.LengthFilter(3))
+            setText(loadReplayCount().toString())
+            selectAll()
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(TextView(this@MainActivity).apply {
+                text = getString(R.string.replay_count_label)
+                setTextColor(getColor(R.color.text_secondary))
+                textSize = 13f
+            })
+            addView(input, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(6) })
         }
 
-        replayCount = count
-        saveReplayCount(count)
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.replay_dialog_title)
-            .setMessage(getString(R.string.replay_dialog_message, count, client.station))
-            .setPositiveButton(R.string.replay_dialog_confirm) { _, _ -> startReplay(client) }
+            .setMessage(client.station)
+            .setView(container)
+            .setPositiveButton(R.string.replay_dialog_confirm, null)
             .setNegativeButton(R.string.replay_dialog_cancel, null)
-            .show()
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val count = parseReplayCount(input.text?.toString().orEmpty())
+                if (count == null)
+                {
+                    input.error = getString(R.string.replay_count_invalid, MIN_REPLAY_COUNT, MAX_REPLAY_COUNT)
+                    return@setOnClickListener
+                }
+                replayCount = count
+                saveReplayCount(count)
+                dialog.dismiss()
+                startReplay(client, count)
+            }
+        }
+        dialog.show()
     }
 
     /** Starts deauth replay for a concrete client station on the active capture target. */
-    private fun startReplay(client: WifiClient)
+    private fun startReplay(client: WifiClient, count: Int)
     {
         if (commandInProgress) return
-        val count = parseReplayCount(binding.replayCountEditText.text?.toString().orEmpty())
-        if (count == null)
-        {
-            binding.replayCountEditText.error = getString(R.string.replay_count_invalid, MIN_REPLAY_COUNT, MAX_REPLAY_COUNT)
-            return
-        }
-
-        replayCount = count
-        saveReplayCount(count)
         commandInProgress = true
         renderClients(currentClients)
         Toast.makeText(this, getString(R.string.replay_running), Toast.LENGTH_SHORT).show()
