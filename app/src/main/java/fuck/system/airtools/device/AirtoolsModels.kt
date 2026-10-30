@@ -1,5 +1,9 @@
 package fuck.system.airtools.device
 
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.CodingErrorAction
+
 sealed class AirodumpTarget
 {
     object All : AirodumpTarget()
@@ -161,11 +165,14 @@ object AirtoolsProtocol
         return AirtoolsStatus(mode, target, channel, deviceName, deviceVersion)
     }
 
+    /** Parses network rows using the explicit SSID encoding declared by the response header. */
     fun parseNetworks(text: String): List<WifiNetwork>
     {
-        return text.lineSequence()
+        val lines = text.lineSequence().toList()
+        val hexEncodedSsid = lines.firstOrNull() == "OK networks ssid_encoding=hex"
+        return lines.asSequence()
             .filter { it.isNotBlank() && !it.startsWith("OK ") && !it.startsWith("#") && !it.startsWith("ERR ") }
-            .mapNotNull(::parseNetworkLine)
+            .mapNotNull { parseNetworkLine(it, hexEncodedSsid) }
             .sortedWith(
                 compareByDescending<WifiNetwork> { it.signalDbm ?: Int.MIN_VALUE }
                     .thenByDescending { it.beacons + it.probes + it.dataFrames }
@@ -174,7 +181,8 @@ object AirtoolsProtocol
             .toList()
     }
 
-    private fun parseNetworkLine(line: String): WifiNetwork?
+    /** Parses one Wi-Fi network observation with the declared SSID wire encoding. */
+    private fun parseNetworkLine(line: String, hexEncodedSsid: Boolean): WifiNetwork?
     {
         val parts = line.split(',', limit = 7)
         if (parts.size != 7 || !macRegex.matches(parts[0])) return null
@@ -189,8 +197,54 @@ object AirtoolsProtocol
             beacons = parts[3].toLongOrNull() ?: return null,
             probes = parts[4].toLongOrNull() ?: return null,
             dataFrames = parts[5].toLongOrNull() ?: return null,
-            essid = parts[6]
+            essid = if (hexEncodedSsid) decodeHexSsid(parts[6]) else parts[6]
         )
+    }
+
+    /** Decodes UTF-8 SSIDs and shows the original bytes in hex when text decoding is impossible. */
+    private fun decodeHexSsid(hex: String): String
+    {
+        require(hex.length <= 64 && hex.length % 2 == 0) { "Invalid SSID hex length" }
+        if (hex.isEmpty()) return "<hidden/unknown>"
+
+        val bytes = ByteArray(hex.length / 2)
+        for (index in bytes.indices)
+        {
+            val high = hexDigit(hex[index * 2])
+            val low = hexDigit(hex[index * 2 + 1])
+            bytes[index] = ((high shl 4) or low).toByte()
+        }
+
+        val decoded = try
+        {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        }
+        catch (_: CharacterCodingException)
+        {
+            return "SSID 0x${hex.uppercase()}"
+        }
+
+        return if (decoded.any { Character.isISOControl(it) || it == '\uFFFD' })
+        {
+            "SSID 0x${hex.uppercase()}"
+        }
+        else
+        {
+            decoded
+        }
+    }
+
+    /** Returns the value of an ASCII hexadecimal digit. */
+    private fun hexDigit(value: Char): Int = when (value)
+    {
+        in '0'..'9' -> value - '0'
+        in 'a'..'f' -> value - 'a' + 10
+        in 'A'..'F' -> value - 'A' + 10
+        else -> throw IllegalArgumentException("Invalid SSID hex character")
     }
 
     /** Parses client station rows from /clients. */

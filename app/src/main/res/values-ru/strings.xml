@@ -9,6 +9,7 @@
     <string name="device_details_format">Устройство: %1$s · прошивка %2$s</string>
     <string name="device_version_unknown">неизвестно</string>
     <string name="device_unavailable_hint">Ожидание устройства AIRTOOLS. Приложение подключится автоматически.</string>
+    <string name="back_to_networks">Назад к списку Wi-Fi сетей</string>
     <string name="wifi_networks">Wi-Fi сети</string>
     <string name="scanning_channels">Сканирование Wi-Fi сетей</string>
     <plurals name="networks_found">

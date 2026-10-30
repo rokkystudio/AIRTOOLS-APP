@@ -12,8 +12,8 @@ android {
         applicationId = "fuck.system.airtools"
         minSdk = 26
         targetSdk = 37
-        versionCode = 14
-        versionName = "1.13"
+        versionCode = 15
+        versionName = "1.14"
     }
 
     buildTypes {

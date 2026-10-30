@@ -60,6 +60,7 @@ class MainActivity : AppCompatActivity()
     private val captureDateFormat: DateFormat by lazy { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM) }
     private val capturedHandshakes = mutableMapOf<String, HandshakeIndexEntry>()
 
+    /** Initializes the interface, monitors device state, and registers capture-screen back navigation. */
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
@@ -74,14 +75,7 @@ class MainActivity : AppCompatActivity()
         {
             override fun handleOnBackPressed()
             {
-                if (currentScreen == Screen.CAPTURE)
-                {
-                    returnToNetworkSelection()
-                }
-                else
-                {
-                    finish()
-                }
+                navigateBack()
             }
         })
 
@@ -373,6 +367,24 @@ class MainActivity : AppCompatActivity()
         }
     }
 
+    /**
+     * Returns from the selected network to the network list, or exits from the top-level screen.
+     */
+    private fun navigateBack()
+    {
+        if (currentScreen == Screen.CAPTURE)
+        {
+            returnToNetworkSelection()
+        }
+        else
+        {
+            finish()
+        }
+    }
+
+    /**
+     * Clears the selected capture target and resumes scanning all Wi-Fi networks.
+     */
     private fun returnToNetworkSelection()
     {
         if (commandInProgress) return
@@ -407,6 +419,10 @@ class MainActivity : AppCompatActivity()
         }
     }
 
+    /**
+     * Displays the connection state and the latest available device details.
+     * Connected refreshes without device status preserve the displayed device information.
+     */
     private fun renderConnection(state: ConnectionState, status: AirtoolsStatus? = null)
     {
         val (textRes, colorRes) = when (state)
@@ -417,22 +433,44 @@ class MainActivity : AppCompatActivity()
         }
         binding.connectionStatusTextView.setText(textRes)
         binding.connectionStatusIndicator.backgroundTintList = ColorStateList.valueOf(getColor(colorRes))
-        binding.connectionDeviceTextView.text = if (state == ConnectionState.CONNECTED && status != null)
+        if (state == ConnectionState.CONNECTED)
         {
-            getString(
-                R.string.device_details_format,
-                status.deviceName,
-                status.deviceVersion ?: getString(R.string.device_version_unknown)
-            )
+            if (status != null)
+            {
+                binding.connectionDeviceTextView.text = getString(
+                    R.string.device_details_format,
+                    status.deviceName,
+                    status.deviceVersion ?: getString(R.string.device_version_unknown)
+                )
+            }
         }
         else
         {
-            getString(R.string.device_details_unknown)
+            binding.connectionDeviceTextView.text = getString(R.string.device_details_unknown)
         }
     }
 
+    /**
+     * Displays the active device screen and configures the header's navigation icon.
+     */
     private fun renderScreen(screen: Screen)
     {
+        if (currentScreen != screen)
+        {
+            if (screen == Screen.CAPTURE)
+            {
+                neoTopBar.setPanelNavigation(
+                    R.drawable.ic_arrow_back,
+                    getString(R.string.back_to_networks),
+                    ::navigateBack
+                )
+            }
+            else if (currentScreen == Screen.CAPTURE)
+            {
+                neoTopBar.setPanelIcon(R.mipmap.ic_launcher)
+            }
+        }
+
         currentScreen = screen
         binding.scanContainer.visibility = if (screen == Screen.SCAN || screen == Screen.CONNECTING) View.VISIBLE else View.GONE
         binding.captureScrollView.visibility = if (screen == Screen.CAPTURE) View.VISIBLE else View.GONE

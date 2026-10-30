@@ -9,6 +9,7 @@
     <string name="device_details_format">Device: %1$s · firmware %2$s</string>
     <string name="device_version_unknown">unknown</string>
     <string name="device_unavailable_hint">Waiting for the AIRTOOLS device. The app will reconnect automatically.</string>
+    <string name="back_to_networks">Back to Wi-Fi networks</string>
     <string name="wifi_networks">Wi-Fi networks</string>
     <string name="scanning_channels">Scanning Wi-Fi networks</string>
     <plurals name="networks_found">
