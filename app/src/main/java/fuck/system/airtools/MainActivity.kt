@@ -25,6 +25,7 @@ import androidx.core.os.LocaleListCompat
 import badfox.logic.neoui.NeoLanguageDefaults
 import badfox.logic.neoui.NeoThemeDefaults
 import badfox.logic.neoui.NeoTopBarView
+import badfox.logic.neoui.applyNeoSystemBarInsets
 import java.io.File
 import java.io.OutputStream
 import java.text.DateFormat
@@ -69,6 +70,7 @@ class MainActivity : AppCompatActivity()
         uiSettings = UiSettings(applicationContext)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyNeoSystemBarInsets(binding.root)
         neoTopBar = binding.neoTopBar
         renderTopBar()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true)
